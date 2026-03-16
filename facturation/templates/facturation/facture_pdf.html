@@ -1,0 +1,359 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            font-family: Arial, sans-serif;
+            font-size: 12px;
+            color: #212121;
+            padding: 20px;
+        }
+
+        /* ===== HEADER ===== */
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            margin-bottom: 30px;
+            border-bottom: 4px solid #D4830A;
+            padding-bottom: 20px;
+        }
+
+        .logo-section img {
+            width: 120px;
+        }
+
+        .company-info {
+            text-align: right;
+            font-size: 11px;
+            color: #555;
+        }
+
+        .company-name {
+            font-size: 22px;
+            font-weight: bold;
+            color: #D4830A;
+            margin-bottom: 4px;
+        }
+
+        /* ===== TITRE FACTURE ===== */
+        .titre-facture {
+            text-align: center;
+            margin: 20px 0;
+        }
+
+        .titre-facture h1 {
+            font-size: 20px;
+            font-weight: bold;
+            color: #1A1A2E;
+            text-decoration: underline;
+            text-transform: uppercase;
+        }
+
+        .titre-facture .numero {
+            font-size: 16px;
+            color: #D4830A;
+            font-weight: bold;
+            margin-top: 6px;
+        }
+
+        /* ===== BLOC CLIENT + DATE ===== */
+        .info-section {
+            display: flex;
+            justify-content: space-between;
+            margin: 20px 0;
+            gap: 20px;
+        }
+
+        .bloc-client, .bloc-date {
+            border: 1px solid #E0E0E0;
+            padding: 12px 16px;
+            width: 48%;
+            border-radius: 4px;
+        }
+
+        .bloc-label {
+            font-size: 10px;
+            color: #999;
+            margin-bottom: 6px;
+            font-style: italic;
+        }
+
+        .bloc-client p, .bloc-date p {
+            margin-bottom: 3px;
+            font-size: 11px;
+        }
+
+        .bloc-client strong {
+            font-size: 13px;
+            color: #1A1A2E;
+        }
+
+        /* ===== TABLEAU LIGNES ===== */
+        .table-lignes {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 20px 0;
+        }
+
+        .table-lignes thead tr {
+            background-color: #1A1A2E;
+            color: white;
+        }
+
+        .table-lignes thead th {
+            padding: 8px 10px;
+            text-align: left;
+            font-size: 11px;
+        }
+
+        .table-lignes tbody tr:nth-child(even) {
+            background-color: #F5F5F5;
+        }
+
+        .table-lignes tbody tr:nth-child(odd) {
+            background-color: #FFFFFF;
+        }
+
+        .table-lignes tbody td {
+            padding: 8px 10px;
+            font-size: 11px;
+            border-bottom: 1px solid #E0E0E0;
+        }
+
+        .table-lignes tfoot tr {
+            background-color: #F5F5F5;
+        }
+
+        .table-lignes tfoot td {
+            padding: 6px 10px;
+            font-size: 11px;
+        }
+
+        /* ===== TOTAUX ===== */
+        .totaux-section {
+            display: flex;
+            justify-content: flex-end;
+            margin-top: 10px;
+        }
+
+        .totaux-table {
+            width: 350px;
+            border-collapse: collapse;
+        }
+
+        .totaux-table tr td {
+            padding: 6px 12px;
+            font-size: 12px;
+            border-bottom: 1px solid #E0E0E0;
+        }
+
+        .totaux-table tr td:first-child {
+            font-weight: bold;
+            color: #555;
+            text-align: left;
+        }
+
+        .totaux-table tr td:last-child {
+            text-align: right;
+            font-weight: bold;
+        }
+
+        .totaux-table .row-tva td {
+            color: #1565C0;
+        }
+
+        .totaux-table .row-retenue td {
+            color: #B71C1C;
+        }
+
+        .totaux-table .row-total-net {
+            background-color: #D4830A;
+        }
+
+        .totaux-table .row-total-net td {
+            color: white;
+            font-size: 14px;
+            font-weight: bold;
+        }
+
+        /* ===== MONTANT EN LETTRES ===== */
+        .montant-lettres {
+            margin-top: 16px;
+            padding: 10px 14px;
+            background-color: #FFF3E0;
+            border-left: 4px solid #D4830A;
+            font-size: 11px;
+            font-style: italic;
+        }
+
+        .montant-lettres strong {
+            color: #D4830A;
+        }
+
+        /* ===== NOTES ===== */
+        .notes-section {
+            margin-top: 20px;
+            font-size: 11px;
+            color: #555;
+            font-style: italic;
+        }
+
+        /* ===== FOOTER ===== */
+        .footer {
+            margin-top: 40px;
+            border-top: 2px solid #D4830A;
+            padding-top: 12px;
+            display: flex;
+            justify-content: space-between;
+            font-size: 10px;
+            color: #777;
+        }
+    </style>
+</head>
+<body>
+
+    <!-- HEADER -->
+    <div class="header">
+        <div class="logo-section">
+            <div class="company-name">ESVE</div>
+            <div style="font-size:10px; color:#555;">Ecology Smart Vision Equipement</div>
+            <div style="font-size:10px; color:#D4830A; font-weight:bold;">The Supplier You Need</div>
+        </div>
+        <div class="company-info">
+            <div>S/C 04 BP 398 OUAGA 04</div>
+            <div>Secteur 42 OUAGADOUGOU</div>
+            <div>Tél : (+226) 05 56 25 92</div>
+            <div>direction@svequipement.com</div>
+            <div style="margin-top:6px;">N° RCCM : BF-OUA-01-2025-B13-08308</div>
+            <div>N° IFU : 00272062K</div>
+            <div>N° RIB : BF148-01001-077355324101-26</div>
+        </div>
+    </div>
+
+    <!-- TITRE -->
+    <div class="titre-facture">
+        <h1>{% if facture.type_doc == 'PROFORMA' %}Facture Pro-Forma{% else %}Facture{% endif %}</h1>
+        <div class="numero">N° : {{ facture.numero }}</div>
+    </div>
+
+    <!-- CLIENT + DATE -->
+    <div class="info-section">
+        <div class="bloc-client">
+            <div class="bloc-label">Client :</div>
+            <strong>{{ facture.client.nom_entreprise }}</strong>
+            {% if facture.client.adresse %}<p>{{ facture.client.adresse }}</p>{% endif %}
+            {% if facture.client.telephone %}<p>Tél : {{ facture.client.telephone }}</p>{% endif %}
+            {% if facture.client.rccm %}<p>N° RCCM : {{ facture.client.rccm }}</p>{% endif %}
+            {% if facture.client.ifu %}<p>N° IFU : {{ facture.client.ifu }}</p>{% endif %}
+            {% if facture.client.regime_imposition %}<p>Régime d'Imposition : {{ facture.client.regime_imposition }}</p>{% endif %}
+            {% if facture.client.division_fiscale %}<p>Division fiscale : {{ facture.client.division_fiscale }}</p>{% endif %}
+        </div>
+        <div class="bloc-date">
+            <div class="bloc-label">Détails de l'offre :</div>
+            <p><strong>Date de la facture :</strong> {{ facture.date_creation|date:"d/m/Y" }}</p>
+            <p><strong>Validité de l'offre :</strong> {{ facture.validite_jours }} Jours</p>
+            {% if facture.proforma_origine %}
+            <p><strong>Proforma origine :</strong> {{ facture.proforma_origine.numero }}</p>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- TABLEAU DES LIGNES -->
+    <table class="table-lignes">
+        <thead>
+            <tr>
+                <th>Description</th>
+                <th>Réf. client</th>
+                <th>Réf. fournisseur</th>
+                <th>Prix unitaire HT XOF</th>
+                <th>Quantités</th>
+                <th>Total HT XOF</th>
+                <th>Délais</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for ligne in facture.lignes.all %}
+            <tr>
+                <td>{{ ligne.description }}</td>
+                <td>{{ ligne.reference_client }}</td>
+                <td>{{ ligne.reference_fournisseur }}</td>
+                <td style="text-align:right;">{{ ligne.prix_unitaire_ht|floatformat:0 }}</td>
+                <td style="text-align:center;">{{ ligne.quantite }}</td>
+                <td style="text-align:right;">{{ ligne.total_ht|floatformat:0 }}</td>
+                <td>{{ ligne.delais }}</td>
+            </tr>
+            {% empty %}
+            <tr><td colspan="7" style="text-align:center;">Aucune ligne</td></tr>
+            {% endfor %}
+        </tbody>
+    </table>
+
+    <!-- TOTAUX -->
+    <div class="totaux-section">
+        <table class="totaux-table">
+            <tr>
+                <td>Montant HT Brut</td>
+                <td>{{ facture.total_ht_brut|floatformat:0 }} XOF</td>
+            </tr>
+            {% if facture.remise_pct > 0 %}
+            <tr>
+                <td>Remise ({{ facture.remise_pct }}%)</td>
+                <td>- {{ facture.montant_remise|floatformat:0 }} XOF</td>
+            </tr>
+            <tr>
+                <td>Montant HT Net</td>
+                <td>{{ facture.total_ht|floatformat:0 }} XOF</td>
+            </tr>
+            {% endif %}
+            <tr class="row-tva">
+                <td>TVA (18%)</td>
+                <td>+ {{ facture.tva_18pct|floatformat:0 }} XOF</td>
+            </tr>
+            <tr class="row-retenue">
+                <td>Retenue (5%)</td>
+                <td>- {{ facture.retenue_5pct|floatformat:0 }} XOF</td>
+            </tr>
+            <tr class="row-retenue">
+                <td>BIC (2%)</td>
+                <td>- {{ facture.bic_2pct|floatformat:0 }} XOF</td>
+            </tr>
+            <tr class="row-total-net">
+                <td>TOTAL NET</td>
+                <td>{{ facture.total_net|floatformat:0 }} XOF</td>
+            </tr>
+        </table>
+    </div>
+
+    <!-- MONTANT EN LETTRES -->
+    <div class="montant-lettres">
+        <strong>Arrêté la présente facture à la somme de :</strong>
+        {{ montant_en_lettres }}
+    </div>
+
+    <!-- NOTES -->
+    {% if facture.notes %}
+    <div class="notes-section">
+        <strong>Notes :</strong> {{ facture.notes }}
+    </div>
+    {% endif %}
+
+    <!-- FOOTER -->
+    <div class="footer">
+        <div>
+            <div>ECOLOGY SMART VISION EQUIPEMENT</div>
+            <div>S/C 04 BP 398 OUAGA 04 — Secteur 42 OUAGADOUGOU</div>
+            <div>(+226) 05 56 25 92 — direction@svequipement.com</div>
+        </div>
+        <div style="text-align:right;">
+            <div>N° RIB : BF148-01001-077355324101-26</div>
+            <div>N° RCCM : BF-OUA-01-2025-B13-08308</div>
+            <div>N° IFU : 00272062K</div>
+        </div>
+    </div>
+
+</body>
+</html>
