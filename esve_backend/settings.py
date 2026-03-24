@@ -43,6 +43,7 @@ INSTALLED_APPS = [
 # =============================================================
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
+    'whitenoise.middleware.WhiteNoiseMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'corsheaders.middleware.CorsMiddleware',          # ← CORS (doit être ici)
     'django.middleware.common.CommonMiddleware',
@@ -151,3 +152,25 @@ AUTH_PASSWORD_VALIDATORS = [
     {'NAME': 'django.contrib.auth.password_validation.CommonPasswordValidator'},
     {'NAME': 'django.contrib.auth.password_validation.NumericPasswordValidator'},
 ]
+
+# Production settings
+import os
+if os.environ.get('RAILWAY_ENVIRONMENT'):
+    DEBUG = False
+    ALLOWED_HOSTS = ['*']
+    
+    # Base de données Railway
+    DATABASE_URL = os.environ.get('DATABASE_URL')
+    if DATABASE_URL:
+        import dj_database_url
+        DATABASES = {
+            'default': dj_database_url.config(default=DATABASE_URL)
+        }
+    
+    # Fichiers statiques
+    STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles')
+    
+    # CORS pour le frontend déployé
+    CORS_ALLOWED_ORIGINS = [
+        os.environ.get('FRONTEND_URL', 'http://localhost:4200'),
+    ]
