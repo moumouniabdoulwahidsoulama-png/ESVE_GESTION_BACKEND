@@ -1,5 +1,6 @@
 from django.db import models
 from decimal import Decimal
+from datetime import date
 from clients.models import Client
 
 
@@ -35,22 +36,26 @@ class Facture(models.Model):
     date_modification   = models.DateTimeField(auto_now=True)
     validite_jours      = models.IntegerField(default=30)
 
-    # Remise globale (en pourcentage, ex: 10 = 10%)
+    # Options de calcul
+    appliquer_remise    = models.BooleanField(default=False)
+    appliquer_tva       = models.BooleanField(default=False)
+    appliquer_retenue   = models.BooleanField(default=False)
+    appliquer_bic       = models.BooleanField(default=False)
+
+    # Remise
     remise_pct          = models.DecimalField(max_digits=5, decimal_places=2, default=0)
 
     # Montants calculés
-    total_ht_brut       = models.DecimalField(max_digits=14, decimal_places=2, default=0)  # avant remise
-    montant_remise      = models.DecimalField(max_digits=14, decimal_places=2, default=0)  # montant remise
-    total_ht            = models.DecimalField(max_digits=14, decimal_places=2, default=0)  # après remise
-    tva_18pct           = models.DecimalField(max_digits=14, decimal_places=2, default=0)  # TVA 18%
-    retenue_5pct        = models.DecimalField(max_digits=14, decimal_places=2, default=0)  # retenue
-    bic_2pct            = models.DecimalField(max_digits=14, decimal_places=2, default=0)  # BIC
-    total_net           = models.DecimalField(max_digits=14, decimal_places=2, default=0)  # total final
+    total_ht_brut       = models.DecimalField(max_digits=14, decimal_places=2, default=0)
+    montant_remise      = models.DecimalField(max_digits=14, decimal_places=2, default=0)
+    total_ht            = models.DecimalField(max_digits=14, decimal_places=2, default=0)
+    tva_18pct           = models.DecimalField(max_digits=14, decimal_places=2, default=0)
+    retenue_5pct        = models.DecimalField(max_digits=14, decimal_places=2, default=0)
+    bic_2pct            = models.DecimalField(max_digits=14, decimal_places=2, default=0)
+    total_net           = models.DecimalField(max_digits=14, decimal_places=2, default=0)
 
-    # PDF
+    # Fichiers et notes
     pdf_file            = models.FileField(upload_to='pdfs/factures/', null=True, blank=True)
-
-    # Notes
     notes               = models.TextField(blank=True)
 
     class Meta:
@@ -62,27 +67,29 @@ class Facture(models.Model):
         return f"{self.numero} — {self.client.nom_entreprise}"
 
     def calculer_totaux(self):
-        """Recalcule tous les montants depuis les lignes."""
-        # 1. Total brut (somme des lignes)
-        total_brut          = sum(ligne.total_ht for ligne in self.lignes.all())
-        self.total_ht_brut  = total_brut
+        total_brut         = sum(ligne.total_ht for ligne in self.lignes.all())
+        self.total_ht_brut = total_brut
 
-        # 2. Remise
-        self.montant_remise = round(total_brut * self.remise_pct / Decimal('100'), 2)
+        # Remise
+        if self.appliquer_remise and self.remise_pct > 0:
+            self.montant_remise = round(total_brut * self.remise_pct / Decimal('100'), 2)
+        else:
+            self.montant_remise = Decimal('0')
 
-        # 3. Total HT après remise
-        total_ht            = total_brut - self.montant_remise
-        self.total_ht       = total_ht
+        total_ht       = total_brut - self.montant_remise
+        self.total_ht  = total_ht
 
-        # 4. TVA 18%
-        self.tva_18pct      = round(total_ht * Decimal('0.18'), 2)
+        # TVA
+        self.tva_18pct    = round(total_ht * Decimal('0.18'), 2) if self.appliquer_tva     else Decimal('0')
 
-        # 5. Retenue 5% et BIC 2%
-        self.retenue_5pct   = round(total_ht * Decimal('0.05'), 2)
-        self.bic_2pct       = round(total_ht * Decimal('0.02'), 2)
+        # Retenue
+        self.retenue_5pct = round(total_ht * Decimal('0.05'), 2) if self.appliquer_retenue else Decimal('0')
 
-        # 6. Total net final
-        self.total_net      = round(total_ht + self.tva_18pct - self.retenue_5pct - self.bic_2pct, 2)
+        # BIC 2% = 2% de (HTVA Net + TVA)
+        self.bic_2pct = round( (total_ht + self.tva_18pct) * Decimal('0.02'), 2) if self.appliquer_bic else Decimal('0')
+        
+        # Total net
+        self.total_net = round(total_ht + self.tva_18pct - self.retenue_5pct - self.bic_2pct, 2)
 
         self.save(update_fields=[
             'total_ht_brut', 'montant_remise', 'total_ht',
@@ -90,15 +97,37 @@ class Facture(models.Model):
         ])
 
     def generer_numero(self):
-        """Génère le numéro auto : ESVE26-ID0001-P-0001"""
-        if not self.numero:
-            annee       = self.date_creation.strftime('%y') if self.date_creation else '26'
-            client_id   = str(self.client.id).zfill(4)
-            count       = Facture.objects.filter(client=self.client).count()
-            numero      = str(count).zfill(4)
-            prefix      = 'P' if self.type_doc == 'PROFORMA' else 'F'
-            self.numero = f"ESVE{annee}-ID{client_id}-{prefix}-{numero}"
-            self.save(update_fields=['numero'])
+        annee      = self.date_creation.strftime('%y') if self.date_creation else date.today().strftime('%y')
+        client_id  = str(self.client.id).zfill(4)
+        prefix     = 'P' if self.type_doc == 'PROFORMA' else 'F'
+        prefix_full = f'ESVE{annee}-ID{client_id}-{prefix}-'
+
+        # Trouver le dernier numéro valide pour ce client et ce type
+        derniers = Facture.objects.filter(
+            numero__startswith=prefix_full
+        ).exclude(
+            numero__startswith='TEMP'
+        ).order_by('-numero')
+
+        if derniers.exists():
+            dernier_numero = derniers.first().numero
+            try:
+                dernier_count = int(dernier_numero.split('-')[-1])
+                count = dernier_count + 1
+            except (ValueError, IndexError):
+                count = derniers.count() + 1
+        else:
+            count = 1
+
+        # S'assurer que le numéro est unique
+        while True:
+            nouveau_numero = f"{prefix_full}{str(count).zfill(4)}"
+            if not Facture.objects.filter(numero=nouveau_numero).exists():
+                break
+            count += 1
+
+        self.numero = nouveau_numero
+        self.save(update_fields=['numero'])
 
 
 class LigneFacture(models.Model):

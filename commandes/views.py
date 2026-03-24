@@ -10,12 +10,20 @@ from .pdf_generator import generer_pdf_bon_commande
 
 
 class BonCommandeViewSet(viewsets.ModelViewSet):
-    queryset           = BonCommande.objects.all()
     permission_classes = [IsAuthenticated]
     filter_backends    = [DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter]
     filterset_fields   = ['statut']
     search_fields      = ['numero', 'fournisseur_nom']
     ordering_fields    = ['date_commande', 'total_net']
+
+    def get_queryset(self):
+        user = self.request.user
+        try:
+            if user.profil.role == 'CLIENT':
+                return BonCommande.objects.none()
+        except Exception:
+            pass
+        return BonCommande.objects.all()
 
     def get_serializer_class(self):
         if self.action in ['create', 'update', 'partial_update']:
@@ -24,7 +32,6 @@ class BonCommandeViewSet(viewsets.ModelViewSet):
 
     @action(detail=True, methods=['post'])
     def generer_pdf(self, request, pk=None):
-        """Génère ou régénère le PDF du bon de commande."""
         bon = self.get_object()
         try:
             generer_pdf_bon_commande(bon)
@@ -40,9 +47,7 @@ class BonCommandeViewSet(viewsets.ModelViewSet):
 
     @action(detail=True, methods=['get'])
     def pdf(self, request, pk=None):
-        """Télécharge le PDF du bon de commande."""
         bon = self.get_object()
-
         if not bon.pdf_file:
             try:
                 generer_pdf_bon_commande(bon)
@@ -51,7 +56,6 @@ class BonCommandeViewSet(viewsets.ModelViewSet):
                     {'error': f'Impossible de générer le PDF : {str(e)}'},
                     status=status.HTTP_500_INTERNAL_SERVER_ERROR
                 )
-
         response = FileResponse(
             bon.pdf_file.open('rb'),
             content_type='application/pdf'
