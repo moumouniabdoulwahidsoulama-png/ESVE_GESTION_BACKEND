@@ -10,7 +10,7 @@ from io import BytesIO
 import os
 
 # Couleurs — jaune/or ESVE
-ORANGE_ESVE  = colors.HexColor('#D4A017')
+ORANGE_ESVE  = colors.HexColor('#D4A017')   # Jaune or
 DARK_ESVE    = colors.HexColor('#1A1A2E')
 GRIS_CLAIR   = colors.HexColor('#F5F5F5')
 BLANC        = colors.white
@@ -34,8 +34,21 @@ def nombre_en_lettres(montant):
 def build_header(style_normal, style_center):
     logo_path = get_logo_path()
 
+    # Slogan centré et grand
+    slogan = Paragraph(
+        '<font size="20" color="#D4A017"><b>The Supplier You Need</b></font>',
+        style_center
+    )
+
+    # Nom entreprise
+    company_name = Paragraph(
+        '<font size="11" color="#555555">Ecology Smart Vision Equipement</font>',
+        style_center
+    )
+
     if logo_path:
         logo = RLImage(logo_path, width=3.5*cm, height=3.5*cm)
+        # Logo à gauche, slogan+nom centré
         header_data = [[logo, Paragraph(
             '<font size="22" color="#D4A017"><b>The Supplier You Need</b></font><br/>'
             '<font size="10" color="#555555">Ecology Smart Vision Equipement</font>',
@@ -84,7 +97,7 @@ def build_footer(style_normal, style_right):
     return t
 
 
-def generer_pdf_bon_commande(bon):
+def generer_pdf_facture(facture):
     buffer = BytesIO()
 
     doc = SimpleDocTemplate(
@@ -118,33 +131,31 @@ def generer_pdf_bon_commande(bon):
     elements.append(Spacer(1, 0.5*cm))
 
     # TITRE
-    elements.append(Paragraph('<u>BON DE COMMANDE</u>', style_title))
-    elements.append(Paragraph(f'N° : {bon.numero}', style_numero))
+    type_label = "FACTURE PRO-FORMA" if facture.type_doc == 'PROFORMA' else "FACTURE"
+    elements.append(Paragraph(f'<u>{type_label}</u>', style_title))
+    elements.append(Paragraph(f'N° : {facture.numero}', style_numero))
     elements.append(Spacer(1, 0.5*cm))
 
-    # FOURNISSEUR + DÉTAILS
-    fournisseur_info = f'<b>{bon.fournisseur_nom}</b><br/>'
-    if bon.fournisseur_adresse:          fournisseur_info += f'{bon.fournisseur_adresse}<br/>'
-    if bon.fournisseur_ifu:              fournisseur_info += f'IFU : {bon.fournisseur_ifu}<br/>'
-    if bon.fournisseur_rccm:             fournisseur_info += f'RCCM : {bon.fournisseur_rccm}<br/>'
-    if bon.fournisseur_division_fiscale: fournisseur_info += f'Division Fiscale : {bon.fournisseur_division_fiscale}<br/>'
-    if bon.fournisseur_regime:           fournisseur_info += f'Regie fisca : {bon.fournisseur_regime}<br/>'
-    if bon.fournisseur_tel:              fournisseur_info += f'Tel : {bon.fournisseur_tel}'
+    # CLIENT + DATE
+    client = facture.client
+    client_info = f'<b>{client.nom_entreprise}</b><br/>'
+    if client.adresse:             client_info += f'{client.adresse}<br/>'
+    if client.telephone:           client_info += f'Tél : {client.telephone}<br/>'
+    if client.rccm:                client_info += f'N° RCCM : {client.rccm}<br/>'
+    if client.ifu:                 client_info += f'N° IFU : {client.ifu}<br/>'
+    if client.regime_imposition:   client_info += f"Régime d'Imposition : {client.regime_imposition}<br/>"
+    if client.division_fiscale:    client_info += f"Division fiscale : {client.division_fiscale}"
 
-    details_info = ''
-    if bon.ref_proforma_fournisseur:
-        details_info += f'<b>FACTURE PROFORMA</b><br/>'
-        details_info += f'<b>N°{bon.ref_proforma_fournisseur}</b><br/>'
-    if bon.date_proforma_fournisseur:
-        details_info += f'<b>Date :</b> {bon.date_proforma_fournisseur.strftime("%d %B %Y")}<br/>'
-    details_info += f'<b>Date commande :</b> {bon.date_commande.strftime("%d/%m/%Y")}<br/>'
-    details_info += f'<b>Validité :</b> 30 jours<br/>'
-    if bon.termes_paiement:  details_info += f'<b>Termes de paiement :</b> {bon.termes_paiement}<br/>'
-    if bon.termes_livraison: details_info += f'<b>Termes de livraison :</b> {bon.termes_livraison}'
+    date_info = (
+        f'<b>Date de la facture :</b> {facture.date_creation.strftime("%d/%m/%Y")}<br/>'
+        f'<b>Validité :</b> {facture.validite_jours} Jours'
+    )
+    if facture.proforma_origine:
+        date_info += f'<br/><b>Proforma origine :</b> {facture.proforma_origine.numero}'
 
     info_data = [[
-        Paragraph('<font color="#999999"><i>Client :</i></font><br/>' + fournisseur_info, style_normal),
-        Paragraph('<font color="#999999"><i>Détails de l\'offre :</i></font><br/>' + details_info, style_normal),
+        Paragraph('<font color="#999999"><i>Client :</i></font><br/>' + client_info, style_normal),
+        Paragraph('<font color="#999999"><i>Détails de l\'offre :</i></font><br/>' + date_info, style_normal),
     ]]
     info_table = Table(info_data, colWidths=[9*cm, 9*cm])
     info_table.setStyle(TableStyle([
@@ -166,19 +177,17 @@ def generer_pdf_bon_commande(bon):
         alignment=TA_CENTER, wordWrap='CJK'
     )
 
-    delais_label = 'Délais DDP OUAGA' if bon.termes_livraison and 'DDP' in bon.termes_livraison else 'Délais'
-
     lignes_data = [[
-        Paragraph('Description',             style_header_col),
-        Paragraph('Référence client',         style_header_col),
-        Paragraph('Référence fournisseur',    style_header_col),
-        Paragraph('Prix unitaire HT XOF',     style_header_col),
-        Paragraph('Quantités',               style_header_col),
-        Paragraph('Total HT XOF',            style_header_col),
-        Paragraph(delais_label,              style_header_col),
+        Paragraph('Description',            style_header_col),
+        Paragraph('Réf. client',            style_header_col),
+        Paragraph('Réf. fournisseur',       style_header_col),
+        Paragraph('Prix unitaire HTVA XOF', style_header_col),
+        Paragraph('Quantités',              style_header_col),
+        Paragraph('Total HTVA XOF',         style_header_col),
+        Paragraph('Délais',                 style_header_col),
     ]]
 
-    for ligne in bon.lignes.all():
+    for ligne in facture.lignes.all():
         lignes_data.append([
             Paragraph(ligne.description or '', style_normal),
             Paragraph(ligne.reference_client or '', style_normal),
@@ -200,21 +209,9 @@ def generer_pdf_bon_commande(bon):
         Paragraph('', style_normal),
     ])
 
-    # Lignes vides supplémentaires
-    for _ in range(3):
-        lignes_data.append([
-            Paragraph('', style_normal),
-            Paragraph('', style_normal),
-            Paragraph('', style_normal),
-            Paragraph('', style_normal),
-            Paragraph('', style_normal),
-            Paragraph('-', style_right),
-            Paragraph('', style_normal),
-        ])
-
     lignes_table = Table(
         lignes_data,
-        colWidths=[4.5*cm, 2*cm, 2.3*cm, 2.5*cm, 1.5*cm, 2.5*cm, 2.7*cm]
+        colWidths=[5*cm, 2*cm, 2.2*cm, 2.5*cm, 1.5*cm, 2.5*cm, 2.3*cm]
     )
     lignes_table.setStyle(TableStyle([
         ('BACKGROUND',     (0,0), (-1,0), ORANGE_ESVE),
@@ -224,46 +221,56 @@ def generer_pdf_bon_commande(bon):
         ('ROWBACKGROUNDS', (0,1), (-1,-1), [BLANC, GRIS_CLAIR]),
         ('GRID',           (0,0), (-1,-1), 0.3, colors.HexColor('#E0E0E0')),
         ('VALIGN',         (0,0), (-1,-1), 'MIDDLE'),
-        ('TOPPADDING',     (0,0), (-1,-1), 4),
-        ('BOTTOMPADDING',  (0,0), (-1,-1), 4),
-        ('LEFTPADDING',    (0,0), (-1,-1), 4),
+        ('TOPPADDING',     (0,0), (-1,-1), 5),
+        ('BOTTOMPADDING',  (0,0), (-1,-1), 5),
+        ('LEFTPADDING',    (0,0), (-1,-1), 5),
         ('ALIGN',          (0,0), (-1,0), 'CENTER'),
     ]))
     elements.append(lignes_table)
-    elements.append(Spacer(1, 0.3*cm))
+    elements.append(Spacer(1, 0.4*cm))
 
     # TOTAUX
     totaux_data = [
-        ['Montant HT', f"{int(bon.total_ht):,} XOF".replace(',', ' ')],
+        ['Montant HTVA', f"{int(facture.total_ht_brut):,} XOF".replace(',', ' ')],
     ]
 
-    if bon.appliquer_tva and bon.tva_18pct > 0:
+    if facture.appliquer_remise and facture.remise_pct > 0:
         totaux_data.append([
-            'TVA 18%',
-            f"{int(bon.tva_18pct):,} XOF".replace(',', ' ')
+            f'Remise ({facture.remise_pct}%)',
+            f"- {int(facture.montant_remise):,} XOF".replace(',', ' ')
+        ])
+        totaux_data.append([
+            'Montant HTVA Net',
+            f"{int(facture.total_ht):,} XOF".replace(',', ' ')
         ])
 
-    if bon.appliquer_retenue and bon.retenue_5pct > 0:
+    if facture.appliquer_tva and facture.tva_18pct > 0:
+        totaux_data.append([
+            'TVA (18%)',
+            f"+ {int(facture.tva_18pct):,} XOF".replace(',', ' ')
+        ])
+
+    if facture.appliquer_retenue and facture.retenue_5pct > 0:
         totaux_data.append([
             'Retenue (5%)',
-            f"- {int(bon.retenue_5pct):,} XOF".replace(',', ' ')
+            f"- {int(facture.retenue_5pct):,} XOF".replace(',', ' ')
         ])
 
-    if bon.appliquer_bic and bon.bic_2pct > 0:
+    if facture.appliquer_bic and facture.bic_2pct > 0:
         totaux_data.append([
-            'BIC 2%',
-            f"- {int(bon.bic_2pct):,} XOF".replace(',', ' ')
+            'BIC (2%)',
+            f"- {int(facture.bic_2pct):,} XOF".replace(',', ' ')
         ])
 
     totaux_data.append([
-        'Total TTC',
-        f"{int(bon.total_net):,} XOF".replace(',', ' ')
+        'TOTAL NET',
+        f"{int(facture.total_net):,} XOF".replace(',', ' ')
     ])
 
     totaux_table = Table(totaux_data, colWidths=[5*cm, 4*cm], hAlign='RIGHT')
     totaux_style = [
         ('FONTSIZE',       (0,0), (-1,-1), 9),
-        ('GRID',           (0,0), (-1,-1), 0.5, colors.HexColor('#E0E0E0')),
+        ('GRID',           (0,0), (-1,-1), 0.3, colors.HexColor('#E0E0E0')),
         ('LEFTPADDING',    (0,0), (-1,-1), 8),
         ('RIGHTPADDING',   (0,0), (-1,-1), 8),
         ('TOPPADDING',     (0,0), (-1,-1), 4),
@@ -288,8 +295,8 @@ def generer_pdf_bon_commande(bon):
     # MONTANT EN LETTRES
     lettres_data = [[
         Paragraph(
-            f'<b>Arrêté le présent Bon de commande à la somme :</b> '
-            f'<b>{nombre_en_lettres(bon.total_net)}</b>',
+            f'<b>Arrêté la présente facture à la somme de :</b> '
+            f'<i>{nombre_en_lettres(facture.total_net)}</i>',
             style_normal)
     ]]
     lettres_table = Table(lettres_data, colWidths=[18*cm])
@@ -302,18 +309,18 @@ def generer_pdf_bon_commande(bon):
     ]))
     elements.append(lettres_table)
 
-    if bon.notes:
+    if facture.notes:
         elements.append(Spacer(1, 0.3*cm))
         elements.append(Paragraph(
-            f'<i><b>Notes :</b> {bon.notes}</i>', style_normal))
+            f'<i><b>Notes :</b> {facture.notes}</i>', style_normal))
 
     doc.build(elements, onFirstPage=on_page, onLaterPages=on_page)
 
     pdf_content = buffer.getvalue()
     buffer.close()
 
-    filename = f"{bon.numero}.pdf"
-    if bon.pdf_file:
-        bon.pdf_file.delete(save=False)
-    bon.pdf_file.save(filename, ContentFile(pdf_content), save=True)
-    return bon.pdf_file
+    filename = f"{facture.numero}.pdf"
+    if facture.pdf_file:
+        facture.pdf_file.delete(save=False)
+    facture.pdf_file.save(filename, ContentFile(pdf_content), save=True)
+    return facture.pdf_file
