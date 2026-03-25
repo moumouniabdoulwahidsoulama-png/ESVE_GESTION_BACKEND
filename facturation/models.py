@@ -41,9 +41,13 @@ class Facture(models.Model):
     appliquer_tva       = models.BooleanField(default=False)
     appliquer_retenue   = models.BooleanField(default=False)
     appliquer_bic       = models.BooleanField(default=False)
+    appliquer_transport = models.BooleanField(default=False)   # ← NOUVEAU
 
     # Remise
     remise_pct          = models.DecimalField(max_digits=5, decimal_places=2, default=0)
+
+    # Transport (montant manuel)
+    montant_transport   = models.DecimalField(max_digits=14, decimal_places=2, default=0)  # ← NOUVEAU
 
     # Montants calculés
     total_ht_brut       = models.DecimalField(max_digits=14, decimal_places=2, default=0)
@@ -86,10 +90,16 @@ class Facture(models.Model):
         self.retenue_5pct = round(total_ht * Decimal('0.05'), 2) if self.appliquer_retenue else Decimal('0')
 
         # BIC 2% = 2% de (HTVA Net + TVA)
-        self.bic_2pct = round( (total_ht + self.tva_18pct) * Decimal('0.02'), 2) if self.appliquer_bic else Decimal('0')
-        
+        self.bic_2pct     = round((total_ht + self.tva_18pct) * Decimal('0.02'), 2) if self.appliquer_bic else Decimal('0')
+
+        # Transport (montant manuel, ajouté au total)
+        transport = self.montant_transport if self.appliquer_transport else Decimal('0')
+
         # Total net
-        self.total_net = round(total_ht + self.tva_18pct - self.retenue_5pct - self.bic_2pct, 2)
+        self.total_net = round(
+            total_ht + self.tva_18pct - self.retenue_5pct - self.bic_2pct + transport,
+            2
+        )
 
         self.save(update_fields=[
             'total_ht_brut', 'montant_remise', 'total_ht',
@@ -97,12 +107,11 @@ class Facture(models.Model):
         ])
 
     def generer_numero(self):
-        annee      = self.date_creation.strftime('%y') if self.date_creation else date.today().strftime('%y')
-        client_id  = str(self.client.id).zfill(4)
-        prefix     = 'P' if self.type_doc == 'PROFORMA' else 'F'
+        annee       = self.date_creation.strftime('%y') if self.date_creation else date.today().strftime('%y')
+        client_id   = str(self.client.id).zfill(4)
+        prefix      = 'P' if self.type_doc == 'PROFORMA' else 'F'
         prefix_full = f'ESVE{annee}-ID{client_id}-{prefix}-'
 
-        # Trouver le dernier numéro valide pour ce client et ce type
         derniers = Facture.objects.filter(
             numero__startswith=prefix_full
         ).exclude(
@@ -119,7 +128,6 @@ class Facture(models.Model):
         else:
             count = 1
 
-        # S'assurer que le numéro est unique
         while True:
             nouveau_numero = f"{prefix_full}{str(count).zfill(4)}"
             if not Facture.objects.filter(numero=nouveau_numero).exists():
