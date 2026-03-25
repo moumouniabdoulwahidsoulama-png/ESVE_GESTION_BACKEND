@@ -173,7 +173,7 @@ def generer_pdf_bon_commande(bon):
         Paragraph('Référence client',         style_header_col),
         Paragraph('Référence fournisseur',    style_header_col),
         Paragraph('Prix unitaire HT XOF',     style_header_col),
-        Paragraph('Quantités',               style_header_col),
+        Paragraph('Quantité',               style_header_col),
         Paragraph('Total HT XOF',            style_header_col),
         Paragraph(delais_label,              style_header_col),
     ]]
