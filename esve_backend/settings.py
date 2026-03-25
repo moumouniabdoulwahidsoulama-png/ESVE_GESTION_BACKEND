@@ -158,7 +158,7 @@ import os
 if os.environ.get('RAILWAY_ENVIRONMENT'):
     DEBUG = False
     ALLOWED_HOSTS = ['*']
-    
+
     # Base de données Railway
     DATABASE_URL = os.environ.get('DATABASE_URL')
     if DATABASE_URL:
@@ -166,11 +166,14 @@ if os.environ.get('RAILWAY_ENVIRONMENT'):
         DATABASES = {
             'default': dj_database_url.config(default=DATABASE_URL)
         }
-    
+
     # Fichiers statiques
     STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles')
-    
-    # CORS pour le frontend déployé
+
+    # CORS — accepter toutes les origines Vercel
     CORS_ALLOWED_ORIGINS = [
-        os.environ.get('FRONTEND_URL', 'http://localhost:4200'),
+        'https://project-xegap.vercel.app',
+        'https://project-xegap-rlvri63es.vercel.app',
     ]
+    CORS_ALLOW_ALL_ORIGINS = True
+    CORS_ALLOW_CREDENTIALS = True
