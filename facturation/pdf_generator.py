@@ -45,8 +45,7 @@ def build_header(style_normal, style_center):
         col_widths = [4*cm, 14*cm]
     else:
         header_data = [[Paragraph(
-            '<font size="22" color="#D4A017"><b>The Supplier You Need</b></font><br/>'
-            '<font size="10" color="#555555">Ecology Smart Vision Equipement</font>',
+            '<font size="22" color="#D4A017"><b>The Supplier You Need</b></font><br/>',
             style_center
         )]]
         col_widths = [18*cm]
