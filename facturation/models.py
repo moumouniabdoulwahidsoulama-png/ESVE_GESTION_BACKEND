@@ -4,6 +4,14 @@ from datetime import date
 from clients.models import Client
 
 
+TERMES_PAIEMENT_CHOICES = [
+    ('100% à la commande',           '100% à la commande'),
+    ('15 jours date de facturation', '15 jours date de facturation'),
+    ('30 jours date de facturation', '30 jours date de facturation'),
+    ('60 jours date de facturation', '60 jours date de facturation'),
+]
+
+
 class Facture(models.Model):
 
     TYPE_CHOICES = [
@@ -36,18 +44,26 @@ class Facture(models.Model):
     date_modification   = models.DateTimeField(auto_now=True)
     validite_jours      = models.IntegerField(default=30)
 
+    # Termes de paiement ← NOUVEAU
+    termes_paiement     = models.CharField(
+                            max_length=50,
+                            choices=TERMES_PAIEMENT_CHOICES,
+                            default='100% à la commande',
+                            blank=True
+                          )
+
     # Options de calcul
     appliquer_remise    = models.BooleanField(default=False)
     appliquer_tva       = models.BooleanField(default=False)
     appliquer_retenue   = models.BooleanField(default=False)
     appliquer_bic       = models.BooleanField(default=False)
-    appliquer_transport = models.BooleanField(default=False)   # ← NOUVEAU
+    appliquer_transport = models.BooleanField(default=False)
 
     # Remise
     remise_pct          = models.DecimalField(max_digits=5, decimal_places=2, default=0)
 
     # Transport (montant manuel)
-    montant_transport   = models.DecimalField(max_digits=14, decimal_places=2, default=0)  # ← NOUVEAU
+    montant_transport   = models.DecimalField(max_digits=14, decimal_places=2, default=0)
 
     # Montants calculés
     total_ht_brut       = models.DecimalField(max_digits=14, decimal_places=2, default=0)
@@ -74,7 +90,6 @@ class Facture(models.Model):
         total_brut         = sum(ligne.total_ht for ligne in self.lignes.all())
         self.total_ht_brut = total_brut
 
-        # Remise
         if self.appliquer_remise and self.remise_pct > 0:
             self.montant_remise = round(total_brut * self.remise_pct / Decimal('100'), 2)
         else:
@@ -83,22 +98,14 @@ class Facture(models.Model):
         total_ht       = total_brut - self.montant_remise
         self.total_ht  = total_ht
 
-        # TVA
         self.tva_18pct    = round(total_ht * Decimal('0.18'), 2) if self.appliquer_tva     else Decimal('0')
-
-        # Retenue
         self.retenue_5pct = round(total_ht * Decimal('0.05'), 2) if self.appliquer_retenue else Decimal('0')
-
-        # BIC 2% = 2% de (HTVA Net + TVA)
         self.bic_2pct     = round((total_ht + self.tva_18pct) * Decimal('0.02'), 2) if self.appliquer_bic else Decimal('0')
 
-        # Transport (montant manuel, ajouté au total)
         transport = self.montant_transport if self.appliquer_transport else Decimal('0')
 
-        # Total net
         self.total_net = round(
-            total_ht + self.tva_18pct - self.retenue_5pct - self.bic_2pct + transport,
-            2
+            total_ht + self.tva_18pct - self.retenue_5pct - self.bic_2pct + transport, 2
         )
 
         self.save(update_fields=[
