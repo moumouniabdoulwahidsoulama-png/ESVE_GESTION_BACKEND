@@ -43,11 +43,21 @@ class BonCommande(models.Model):
     date_livraison_prev          = models.DateField(null=True, blank=True)
 
     # Options de calcul
+    appliquer_remise             = models.BooleanField(default=False)   # ← AJOUTÉ
     appliquer_tva                = models.BooleanField(default=False)
     appliquer_retenue            = models.BooleanField(default=False)
     appliquer_bic                = models.BooleanField(default=False)
+    appliquer_transport          = models.BooleanField(default=False)   # ← AJOUTÉ
 
-    # Montants
+    # Remise
+    remise_pct                   = models.DecimalField(max_digits=5, decimal_places=2, default=0)   # ← AJOUTÉ
+
+    # Transport (montant manuel)
+    montant_transport            = models.DecimalField(max_digits=14, decimal_places=2, default=0)  # ← AJOUTÉ
+
+    # Montants calculés
+    total_ht_brut                = models.DecimalField(max_digits=14, decimal_places=2, default=0)  # ← AJOUTÉ
+    montant_remise               = models.DecimalField(max_digits=14, decimal_places=2, default=0)  # ← AJOUTÉ
     total_ht                     = models.DecimalField(max_digits=14, decimal_places=2, default=0)
     tva_18pct                    = models.DecimalField(max_digits=14, decimal_places=2, default=0)
     retenue_5pct                 = models.DecimalField(max_digits=14, decimal_places=2, default=0)
@@ -68,19 +78,44 @@ class BonCommande(models.Model):
         return f"{self.numero} — {self.fournisseur_nom}"
 
     def calculer_totaux(self):
-        total             = sum(ligne.total_ht for ligne in self.lignes.all())
-        self.total_ht     = total
-        self.tva_18pct    = round(total * Decimal('0.18'), 2) if self.appliquer_tva     else Decimal('0')
-        self.retenue_5pct = round(total * Decimal('0.05'), 2) if self.appliquer_retenue else Decimal('0')
-        self.bic_2pct = round((total + self.tva_18pct) * Decimal('0.02'), 2) if self.appliquer_bic else Decimal('0')
-        self.total_net    = round(total + self.tva_18pct - self.retenue_5pct - self.bic_2pct, 2)
-        self.save(update_fields=['total_ht', 'tva_18pct', 'retenue_5pct', 'bic_2pct', 'total_net'])
+        total_brut         = sum(ligne.total_ht for ligne in self.lignes.all())
+        self.total_ht_brut = total_brut
+
+        # Remise
+        if self.appliquer_remise and self.remise_pct > 0:
+            self.montant_remise = round(total_brut * self.remise_pct / Decimal('100'), 2)
+        else:
+            self.montant_remise = Decimal('0')
+
+        total_ht       = total_brut - self.montant_remise
+        self.total_ht  = total_ht
+
+        # TVA
+        self.tva_18pct    = round(total_ht * Decimal('0.18'), 2) if self.appliquer_tva     else Decimal('0')
+
+        # Retenue
+        self.retenue_5pct = round(total_ht * Decimal('0.05'), 2) if self.appliquer_retenue else Decimal('0')
+
+        # BIC 2% = 2% de (HT + TVA)
+        self.bic_2pct     = round((total_ht + self.tva_18pct) * Decimal('0.02'), 2) if self.appliquer_bic else Decimal('0')
+
+        # Transport
+        transport = self.montant_transport if self.appliquer_transport else Decimal('0')
+
+        # Total net
+        self.total_net = round(
+            total_ht + self.tva_18pct - self.retenue_5pct - self.bic_2pct + transport, 2
+        )
+
+        self.save(update_fields=[
+            'total_ht_brut', 'montant_remise', 'total_ht',
+            'tva_18pct', 'retenue_5pct', 'bic_2pct', 'total_net'
+        ])
 
     def generer_numero(self):
-        annee        = date.today().strftime('%y')
-        prefix_full  = f'ESVE{annee}-BC-'
+        annee       = date.today().strftime('%y')
+        prefix_full = f'ESVE{annee}-BC-'
 
-        # Trouver le dernier numéro valide
         derniers = BonCommande.objects.filter(
             numero__startswith=prefix_full
         ).exclude(
@@ -97,7 +132,6 @@ class BonCommande(models.Model):
         else:
             count = 1
 
-        # S'assurer que le numéro est unique
         while True:
             nouveau_numero = f"{prefix_full}{str(count).zfill(4)}"
             if not BonCommande.objects.filter(numero=nouveau_numero).exists():
