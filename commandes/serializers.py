@@ -20,7 +20,9 @@ class BonCommandeSerializer(serializers.ModelSerializer):
         model  = BonCommande
         fields = '__all__'
         read_only_fields = [
-            'numero', 'total_ht', 'tva_18pct',
+            'numero',
+            'total_ht_brut', 'montant_remise',   # ← AJOUTÉS
+            'total_ht', 'tva_18pct',
             'retenue_5pct', 'bic_2pct', 'total_net'
         ]
 
@@ -32,46 +34,32 @@ class BonCommandeCreateSerializer(serializers.ModelSerializer):
         model  = BonCommande
         fields = '__all__'
         read_only_fields = [
-            'numero', 'total_ht', 'tva_18pct',
+            'numero',
+            'total_ht_brut', 'montant_remise',   # ← AJOUTÉS
+            'total_ht', 'tva_18pct',
             'retenue_5pct', 'bic_2pct', 'total_net'
         ]
 
     def create(self, validated_data):
         lignes_data = validated_data.pop('lignes', [])
-
-        # Numéro temporaire unique
         validated_data['numero'] = f"TEMP-{uuid.uuid4().hex[:8].upper()}"
-
         bon = BonCommande.objects.create(**validated_data)
-
-        # Générer le vrai numéro
         bon.generer_numero()
-
-        # Créer les lignes
         for ligne_data in lignes_data:
             LigneBonCommande.objects.create(bon_commande=bon, **ligne_data)
-
-        # Recalculer avec les bons flags
         bon.refresh_from_db()
         bon.calculer_totaux()
-
         return bon
 
     def update(self, instance, validated_data):
         lignes_data = validated_data.pop('lignes', None)
-
-        # Mettre à jour tous les champs y compris les flags
         for attr, value in validated_data.items():
             setattr(instance, attr, value)
         instance.save()
-
         if lignes_data is not None:
             instance.lignes.all().delete()
             for ligne_data in lignes_data:
                 LigneBonCommande.objects.create(bon_commande=instance, **ligne_data)
-
-        # Recalculer avec les nouveaux flags
         instance.refresh_from_db()
         instance.calculer_totaux()
-
         return instance
