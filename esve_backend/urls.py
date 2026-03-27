@@ -23,4 +23,6 @@ urlpatterns = [
     # Dashboard
     path('api/v1/dashboard/stats/', dashboard_stats, name='dashboard-stats'),
 
+    path('api/v1/comptes/', include('comptes.urls')),  # ← AJOUTÉ
+
 ] + static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
