@@ -38,6 +38,22 @@ class FactureViewSet(viewsets.ModelViewSet):
             return FactureCreateSerializer
         return FactureSerializer
 
+    # ✅ Override update — régénère le PDF automatiquement après modification
+    def update(self, request, *args, **kwargs):
+        response = super().update(request, *args, **kwargs)
+        try:
+            facture = self.get_object()
+            # Supprimer l'ancien PDF pour forcer la régénération au prochain téléchargement
+            if facture.pdf_file:
+                facture.pdf_file.delete(save=True)
+        except Exception:
+            pass
+        return response
+
+    def partial_update(self, request, *args, **kwargs):
+        kwargs['partial'] = True
+        return self.update(request, *args, **kwargs)
+
     @action(detail=True, methods=['post'])
     def valider(self, request, pk=None):
         proforma = self.get_object()
@@ -60,12 +76,15 @@ class FactureViewSet(viewsets.ModelViewSet):
             statut              = 'ENVOYE',
             proforma_origine    = proforma,
             validite_jours      = proforma.validite_jours,
+            termes_paiement     = proforma.termes_paiement,
             remise_pct          = proforma.remise_pct,
             notes               = proforma.notes,
             appliquer_remise    = proforma.appliquer_remise,
             appliquer_tva       = proforma.appliquer_tva,
             appliquer_retenue   = proforma.appliquer_retenue,
             appliquer_bic       = proforma.appliquer_bic,
+            appliquer_transport = proforma.appliquer_transport,
+            montant_transport   = proforma.montant_transport,
             total_ht_brut       = proforma.total_ht_brut,
             montant_remise      = proforma.montant_remise,
             total_ht            = proforma.total_ht,
@@ -106,6 +125,9 @@ class FactureViewSet(viewsets.ModelViewSet):
     def generer_pdf(self, request, pk=None):
         facture = self.get_object()
         try:
+            # ✅ Toujours supprimer l'ancien et régénérer
+            if facture.pdf_file:
+                facture.pdf_file.delete(save=False)
             generer_pdf_facture(facture)
             return Response(
                 {'success': f'PDF généré : {facture.numero}.pdf'},
@@ -120,14 +142,17 @@ class FactureViewSet(viewsets.ModelViewSet):
     @action(detail=True, methods=['get'])
     def pdf(self, request, pk=None):
         facture = self.get_object()
-        if not facture.pdf_file:
-            try:
-                generer_pdf_facture(facture)
-            except Exception as e:
-                return Response(
-                    {'error': f'Impossible de générer le PDF : {str(e)}'},
-                    status=status.HTTP_500_INTERNAL_SERVER_ERROR
-                )
+        try:
+            # ✅ Toujours régénérer le PDF pour avoir la version à jour
+            if facture.pdf_file:
+                facture.pdf_file.delete(save=False)
+            generer_pdf_facture(facture)
+            facture.refresh_from_db()
+        except Exception as e:
+            return Response(
+                {'error': f'Impossible de générer le PDF : {str(e)}'},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
         response = FileResponse(
             facture.pdf_file.open('rb'),
             content_type='application/pdf'

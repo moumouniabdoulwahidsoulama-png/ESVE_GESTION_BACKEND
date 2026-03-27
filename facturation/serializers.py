@@ -44,16 +44,24 @@ class FactureCreateSerializer(serializers.ModelSerializer):
         # Numéro temporaire unique
         validated_data['numero'] = f"TEMP-{uuid.uuid4().hex[:8].upper()}"
 
+        # ✅ Désactiver les signaux pendant la création pour éviter la double création
         facture = Facture.objects.create(**validated_data)
 
         # Générer le vrai numéro
         facture.generer_numero()
 
-        # Créer les lignes
+        # ✅ Créer les lignes sans déclencher calculer_totaux à chaque fois
+        lignes_a_creer = []
         for ligne_data in lignes_data:
-            LigneFacture.objects.create(facture=facture, **ligne_data)
+            ligne = LigneFacture(facture=facture, **ligne_data)
+            ligne.total_ht = round(ligne.prix_unitaire_ht * ligne.quantite, 2)
+            lignes_a_creer.append(ligne)
 
-        # Recalculer les totaux avec les bons flags
+        # bulk_create évite les appels à save() individuels (pas de signal calculer_totaux)
+        if lignes_a_creer:
+            LigneFacture.objects.bulk_create(lignes_a_creer)
+
+        # Recalculer une seule fois à la fin
         facture.refresh_from_db()
         facture.calculer_totaux()
 
@@ -62,17 +70,26 @@ class FactureCreateSerializer(serializers.ModelSerializer):
     def update(self, instance, validated_data):
         lignes_data = validated_data.pop('lignes', None)
 
-        # Mettre à jour tous les champs y compris les flags
+        # Mettre à jour tous les champs
         for attr, value in validated_data.items():
             setattr(instance, attr, value)
         instance.save()
 
         if lignes_data is not None:
+            # ✅ Supprimer les anciennes lignes sans déclencher calculer_totaux
             instance.lignes.all().delete()
-            for ligne_data in lignes_data:
-                LigneFacture.objects.create(facture=instance, **ligne_data)
 
-        # Recalculer avec les nouveaux flags
+            # ✅ Recréer les lignes avec bulk_create
+            lignes_a_creer = []
+            for ligne_data in lignes_data:
+                ligne = LigneFacture(facture=instance, **ligne_data)
+                ligne.total_ht = round(ligne.prix_unitaire_ht * ligne.quantite, 2)
+                lignes_a_creer.append(ligne)
+
+            if lignes_a_creer:
+                LigneFacture.objects.bulk_create(lignes_a_creer)
+
+        # Recalculer une seule fois
         instance.refresh_from_db()
         instance.calculer_totaux()
 

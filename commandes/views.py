@@ -30,10 +30,28 @@ class BonCommandeViewSet(viewsets.ModelViewSet):
             return BonCommandeCreateSerializer
         return BonCommandeSerializer
 
+    # ✅ Override update — supprime l'ancien PDF après modification
+    def update(self, request, *args, **kwargs):
+        response = super().update(request, *args, **kwargs)
+        try:
+            bon = self.get_object()
+            if bon.pdf_file:
+                bon.pdf_file.delete(save=True)
+        except Exception:
+            pass
+        return response
+
+    def partial_update(self, request, *args, **kwargs):
+        kwargs['partial'] = True
+        return self.update(request, *args, **kwargs)
+
     @action(detail=True, methods=['post'])
     def generer_pdf(self, request, pk=None):
         bon = self.get_object()
         try:
+            # ✅ Toujours supprimer l'ancien et régénérer
+            if bon.pdf_file:
+                bon.pdf_file.delete(save=False)
             generer_pdf_bon_commande(bon)
             return Response(
                 {'success': f'PDF généré : {bon.numero}.pdf'},
@@ -48,14 +66,17 @@ class BonCommandeViewSet(viewsets.ModelViewSet):
     @action(detail=True, methods=['get'])
     def pdf(self, request, pk=None):
         bon = self.get_object()
-        if not bon.pdf_file:
-            try:
-                generer_pdf_bon_commande(bon)
-            except Exception as e:
-                return Response(
-                    {'error': f'Impossible de générer le PDF : {str(e)}'},
-                    status=status.HTTP_500_INTERNAL_SERVER_ERROR
-                )
+        try:
+            # ✅ Toujours régénérer le PDF pour avoir la version à jour
+            if bon.pdf_file:
+                bon.pdf_file.delete(save=False)
+            generer_pdf_bon_commande(bon)
+            bon.refresh_from_db()
+        except Exception as e:
+            return Response(
+                {'error': f'Impossible de générer le PDF : {str(e)}'},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
         response = FileResponse(
             bon.pdf_file.open('rb'),
             content_type='application/pdf'

@@ -45,8 +45,16 @@ class BonCommandeCreateSerializer(serializers.ModelSerializer):
         validated_data['numero'] = f"TEMP-{uuid.uuid4().hex[:8].upper()}"
         bon = BonCommande.objects.create(**validated_data)
         bon.generer_numero()
+
+        # ✅ bulk_create évite les appels save() individuels
+        lignes_a_creer = []
         for ligne_data in lignes_data:
-            LigneBonCommande.objects.create(bon_commande=bon, **ligne_data)
+            ligne = LigneBonCommande(bon_commande=bon, **ligne_data)
+            ligne.total_ht = round(ligne.prix_unitaire_ht * ligne.quantite, 2)
+            lignes_a_creer.append(ligne)
+        if lignes_a_creer:
+            LigneBonCommande.objects.bulk_create(lignes_a_creer)
+
         bon.refresh_from_db()
         bon.calculer_totaux()
         return bon
@@ -56,10 +64,19 @@ class BonCommandeCreateSerializer(serializers.ModelSerializer):
         for attr, value in validated_data.items():
             setattr(instance, attr, value)
         instance.save()
+
         if lignes_data is not None:
             instance.lignes.all().delete()
+
+            # ✅ bulk_create
+            lignes_a_creer = []
             for ligne_data in lignes_data:
-                LigneBonCommande.objects.create(bon_commande=instance, **ligne_data)
+                ligne = LigneBonCommande(bon_commande=instance, **ligne_data)
+                ligne.total_ht = round(ligne.prix_unitaire_ht * ligne.quantite, 2)
+                lignes_a_creer.append(ligne)
+            if lignes_a_creer:
+                LigneBonCommande.objects.bulk_create(lignes_a_creer)
+
         instance.refresh_from_db()
         instance.calculer_totaux()
         return instance
