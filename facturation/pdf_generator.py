@@ -141,8 +141,10 @@ def generer_pdf_facture(facture):
     if hasattr(client, 'telephone') and client.telephone:
         client_info += f'Tél : {client.telephone}'
 
-    # ── Détails : date + termes de paiement (plus de Statut, plus de Validité)
+    # ── Détails : date + validité + termes de paiement
     details_info = f'<b>Date de la facture :</b> {facture.date_creation.strftime("%d/%m/%Y")}<br/>'
+    if facture.validite_jours:
+        details_info += f'<b>Validité :</b> {facture.validite_jours} Jours<br/>'
     if hasattr(facture, 'termes_paiement') and facture.termes_paiement:
         details_info += f'<b>Termes de paiement :</b> {facture.termes_paiement}'
 
