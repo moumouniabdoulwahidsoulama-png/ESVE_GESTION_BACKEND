@@ -10,11 +10,20 @@ class ProfilSerializer(serializers.ModelSerializer):
 
 
 class UserSerializer(serializers.ModelSerializer):
-    profil = ProfilSerializer(read_only=True)
+    # ✅ role et is_active exposés directement pour le composant Angular
+    role      = serializers.SerializerMethodField()
+    is_active = serializers.BooleanField(read_only=True)
 
     class Meta:
         model  = User
-        fields = ['id', 'username', 'email', 'first_name', 'last_name', 'profil']
+        fields = ['id', 'username', 'email', 'first_name', 'last_name',
+                  'is_active', 'role']
+
+    def get_role(self, obj):
+        try:
+            return obj.profil.role
+        except Exception:
+            return 'EMPLOYE'
 
 
 class RegisterSerializer(serializers.ModelSerializer):
