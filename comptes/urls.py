@@ -8,4 +8,15 @@ urlpatterns = [
     path('demandes/',              views.DemandeApplicationView.as_view(), name='demande-create'),
     path('demandes/liste/',        views.DemandeApplicationListView.as_view(), name='demande-list'),
     path('demandes/<int:pk>/statut/', views.update_demande_statut,         name='demande-statut'),
+    path('utilisateurs/',
+         views.liste_utilisateurs,
+         name='liste-utilisateurs'),
+
+    path('utilisateurs/<int:pk>/supprimer/',
+         views.supprimer_utilisateur,
+         name='supprimer-utilisateur'),
+
+    path('utilisateurs/<int:pk>/modifier/',
+         views.modifier_utilisateur,
+         name='modifier-utilisateur'),
 ]

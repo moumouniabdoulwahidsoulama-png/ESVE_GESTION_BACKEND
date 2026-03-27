@@ -44,8 +44,8 @@ def update_demande_statut(request, pk):
     except DemandeApplication.DoesNotExist:
         return Response({'error': 'Demande introuvable'}, status=status.HTTP_404_NOT_FOUND)
 
-    demande.statut          = request.data.get('statut', demande.statut)
-    demande.notes_internes  = request.data.get('notes_internes', demande.notes_internes)
+    demande.statut         = request.data.get('statut', demande.statut)
+    demande.notes_internes = request.data.get('notes_internes', demande.notes_internes)
     demande.save()
     return Response(DemandeApplicationSerializer(demande).data)
 
@@ -71,6 +71,7 @@ def mon_profil(request):
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
 def liste_utilisateurs(request):
+    """Liste tous les utilisateurs — Admin seulement."""
     try:
         if request.user.profil.role != 'ADMIN':
             return Response({'error': 'Accès refusé'}, status=status.HTTP_403_FORBIDDEN)
@@ -78,3 +79,70 @@ def liste_utilisateurs(request):
         return Response({'error': 'Accès refusé'}, status=status.HTTP_403_FORBIDDEN)
     users = User.objects.all().select_related('profil')
     return Response(UserSerializer(users, many=True).data)
+
+
+@api_view(['DELETE'])
+@permission_classes([IsAuthenticated])
+def supprimer_utilisateur(request, pk):
+    """Supprimer un utilisateur — Admin seulement."""
+    try:
+        if request.user.profil.role != 'ADMIN':
+            return Response({'error': 'Accès refusé'}, status=status.HTTP_403_FORBIDDEN)
+    except Exception:
+        return Response({'error': 'Accès refusé'}, status=status.HTTP_403_FORBIDDEN)
+
+    # Empêcher l'admin de se supprimer lui-même
+    if request.user.id == pk:
+        return Response(
+            {'error': 'Vous ne pouvez pas supprimer votre propre compte.'},
+            status=status.HTTP_400_BAD_REQUEST
+        )
+
+    try:
+        user = User.objects.get(pk=pk)
+    except User.DoesNotExist:
+        return Response({'error': 'Utilisateur introuvable'}, status=status.HTTP_404_NOT_FOUND)
+
+    username = user.username
+    user.delete()
+    return Response(
+        {'success': f'Utilisateur {username} supprimé.'},
+        status=status.HTTP_200_OK
+    )
+
+
+@api_view(['PATCH'])
+@permission_classes([IsAuthenticated])
+def modifier_utilisateur(request, pk):
+    """Modifier un utilisateur (role, nom) — Admin seulement."""
+    try:
+        if request.user.profil.role != 'ADMIN':
+            return Response({'error': 'Accès refusé'}, status=status.HTTP_403_FORBIDDEN)
+    except Exception:
+        return Response({'error': 'Accès refusé'}, status=status.HTTP_403_FORBIDDEN)
+
+    try:
+        user = User.objects.get(pk=pk)
+    except User.DoesNotExist:
+        return Response({'error': 'Utilisateur introuvable'}, status=status.HTTP_404_NOT_FOUND)
+
+    # Mettre à jour les champs de base
+    if 'first_name' in request.data:
+        user.first_name = request.data['first_name']
+    if 'last_name' in request.data:
+        user.last_name = request.data['last_name']
+    if 'email' in request.data:
+        user.email = request.data['email']
+    if 'is_active' in request.data:
+        user.is_active = request.data['is_active']
+    user.save()
+
+    # Mettre à jour le rôle
+    if 'role' in request.data:
+        try:
+            user.profil.role = request.data['role']
+            user.profil.save()
+        except Exception:
+            pass
+
+    return Response(UserSerializer(user).data)
