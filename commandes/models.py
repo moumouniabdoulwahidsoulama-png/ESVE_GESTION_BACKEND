@@ -41,6 +41,7 @@ class BonCommande(models.Model):
     date_commande                = models.DateField(auto_now_add=True)
     date_modification            = models.DateTimeField(auto_now=True)
     date_livraison_prev          = models.DateField(null=True, blank=True)
+    validite_jours               = models.IntegerField(default=30)   # ← AJOUTÉ
 
     # Options de calcul
     appliquer_remise             = models.BooleanField(default=False)   # ← AJOUTÉ

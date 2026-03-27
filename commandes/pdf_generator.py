@@ -145,6 +145,8 @@ def generer_pdf_bon_commande(bon):
     if bon.date_proforma_fournisseur:
         details_info += f'<b>Date :</b> {bon.date_proforma_fournisseur.strftime("%d/%m/%Y")}<br/>'
     details_info += f'<b>Date commande :</b> {bon.date_commande.strftime("%d/%m/%Y")}<br/>'
+    if getattr(bon, 'validite_jours', None):
+        details_info += f'<b>Validité :</b> {bon.validite_jours} jours<br/>'
     if bon.termes_paiement:
         details_info += f'<b>Termes de paiement :</b> {bon.termes_paiement}<br/>'
     if bon.termes_livraison:
@@ -218,37 +220,43 @@ def generer_pdf_bon_commande(bon):
     elements.append(lignes_table)
     elements.append(Spacer(1, 0.3*cm))
 
-    # TOTAUX — utilise getattr pour éviter les crashs si champs manquants
-    total_ht  = getattr(bon, 'total_ht',  0) or 0
-    total_net = getattr(bon, 'total_net', 0) or 0
+    # TOTAUX
+    totaux_data = [['Montant HT', f"{int(bon.total_ht):,} XOF".replace(',', ' ')]]
 
-    totaux_data = [['Montant HT', f"{int(total_ht):,} XOF".replace(',', ' ')]]
-
-    remise_pct    = getattr(bon, 'remise_pct', 0) or 0
-    montant_remise = getattr(bon, 'montant_remise', 0) or 0
-    if getattr(bon, 'appliquer_remise', False) and montant_remise > 0:
+    if bon.appliquer_remise and bon.montant_remise > 0:
         totaux_data.append([
-            f'Remise ({remise_pct}%)',
-            f"- {int(montant_remise):,} XOF".replace(',', ' ')
+            f'Remise ({bon.remise_pct}%)',
+            f"- {int(bon.montant_remise):,} XOF".replace(',', ' ')
         ])
 
-    tva_18pct = getattr(bon, 'tva_18pct', 0) or 0
-    if getattr(bon, 'appliquer_tva', False) and tva_18pct > 0:
-        totaux_data.append(['TVA 18%', f"{int(tva_18pct):,} XOF".replace(',', ' ')])
+    if bon.appliquer_tva and bon.tva_18pct > 0:
+        totaux_data.append([
+            'TVA 18%',
+            f"{int(bon.tva_18pct):,} XOF".replace(',', ' ')
+        ])
 
-    retenue_5pct = getattr(bon, 'retenue_5pct', 0) or 0
-    if getattr(bon, 'appliquer_retenue', False) and retenue_5pct > 0:
-        totaux_data.append(['Retenue (5%)', f"- {int(retenue_5pct):,} XOF".replace(',', ' ')])
+    if bon.appliquer_retenue and bon.retenue_5pct > 0:
+        totaux_data.append([
+            'Retenue (5%)',
+            f"- {int(bon.retenue_5pct):,} XOF".replace(',', ' ')
+        ])
 
-    bic_2pct = getattr(bon, 'bic_2pct', 0) or 0
-    if getattr(bon, 'appliquer_bic', False) and bic_2pct > 0:
-        totaux_data.append(['BIC 2%', f"- {int(bic_2pct):,} XOF".replace(',', ' ')])
+    if bon.appliquer_bic and bon.bic_2pct > 0:
+        totaux_data.append([
+            'BIC 2%',
+            f"- {int(bon.bic_2pct):,} XOF".replace(',', ' ')
+        ])
 
-    montant_transport = getattr(bon, 'montant_transport', 0) or 0
-    if getattr(bon, 'appliquer_transport', False) and montant_transport > 0:
-        totaux_data.append(['Transport', f"{int(montant_transport):,} XOF".replace(',', ' ')])
+    if bon.appliquer_transport and bon.montant_transport > 0:
+        totaux_data.append([
+            'Transport',
+            f"{int(bon.montant_transport):,} XOF".replace(',', ' ')
+        ])
 
-    totaux_data.append(['Total TTC', f"{int(total_net):,} XOF".replace(',', ' ')])
+    totaux_data.append([
+        'Total TTC',
+        f"{int(bon.total_net):,} XOF".replace(',', ' ')
+    ])
 
     totaux_table = Table(totaux_data, colWidths=[5*cm, 4*cm], hAlign='RIGHT')
     totaux_style = [
@@ -278,7 +286,7 @@ def generer_pdf_bon_commande(bon):
     lettres_table = Table([[
         Paragraph(
             f'<b>Arrêté le présent Bon de commande à la somme :</b> '
-            f'<i>{nombre_en_lettres(total_net)}</i>',
+            f'<i>{nombre_en_lettres(bon.total_net)}</i>',
             style_normal)
     ]], colWidths=[18*cm])
     lettres_table.setStyle(TableStyle([
