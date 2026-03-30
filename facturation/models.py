@@ -48,7 +48,7 @@ class Facture(models.Model):
     termes_paiement     = models.CharField(
                             max_length=50,
                             choices=TERMES_PAIEMENT_CHOICES,
-                            default='100% à la commande',
+                            default='',
                             blank=True
                           )
 
