@@ -9,7 +9,7 @@ from .pdf_generator import generer_pdf_offre
 
 
 class OffreServiceViewSet(viewsets.ModelViewSet):
-    queryset           = OffreService.objects.all()
+    queryset           = OffreService.objects.all().order_by('-date_creation')
     serializer_class   = OffreServiceSerializer
     permission_classes = [IsAuthenticated]
 
@@ -33,13 +33,19 @@ class OffreServiceViewSet(viewsets.ModelViewSet):
         return resp
 
 
+# ✅ Vue séparée pour la génération directe sans sauvegarde
+# URL: /api/v1/offres/generer-pdf/  (évite le conflit avec le router DRF)
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])
-def generer_offre_service(request):
+def generer_offre_pdf(request):
+    """
+    Génère un PDF d'offre de service sans sauvegarder en base.
+    POST /api/v1/offres/generer-pdf/
+    """
     data   = request.data
     langue = data.get('langue', 'fr')
     if langue not in ('fr', 'en'):
-        return Response({'error': 'langue doit etre "fr" ou "en"'}, status=400)
+        return Response({'error': 'langue doit être "fr" ou "en"'}, status=400)
     try:
         pdf_bytes = generer_pdf_offre(data)
     except Exception as e:

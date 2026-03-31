@@ -25,25 +25,25 @@ class FactureViewSet(viewsets.ModelViewSet):
                 try:
                     client = Client.objects.get(email=user.email)
                     return Facture.objects.filter(
-                        client=client
+                        client=client,
+                        is_deleted=False          # ✅ exclure corbeille
                     ).select_related('client')
                 except Client.DoesNotExist:
                     return Facture.objects.none()
         except Exception:
             pass
-        return Facture.objects.all().select_related('client')
+        # ✅ Par défaut : n'afficher que les non supprimés
+        return Facture.objects.filter(is_deleted=False).select_related('client')
 
     def get_serializer_class(self):
         if self.action in ['create', 'update', 'partial_update']:
             return FactureCreateSerializer
         return FactureSerializer
 
-    # ✅ Override update — régénère le PDF automatiquement après modification
     def update(self, request, *args, **kwargs):
         response = super().update(request, *args, **kwargs)
         try:
             facture = self.get_object()
-            # Supprimer l'ancien PDF pour forcer la régénération au prochain téléchargement
             if facture.pdf_file:
                 facture.pdf_file.delete(save=True)
         except Exception:
@@ -53,6 +53,42 @@ class FactureViewSet(viewsets.ModelViewSet):
     def partial_update(self, request, *args, **kwargs):
         kwargs['partial'] = True
         return self.update(request, *args, **kwargs)
+
+    # ✅ Override destroy — soft delete au lieu de vraie suppression
+    def destroy(self, request, *args, **kwargs):
+        facture = self.get_object()
+        facture.soft_delete()
+        return Response(status=status.HTTP_204_NO_CONTENT)
+
+    # ✅ Corbeille — liste des documents supprimés
+    @action(detail=False, methods=['get'])
+    def corbeille(self, request):
+        factures = Facture.objects.filter(is_deleted=True).select_related('client')
+        serializer = FactureSerializer(factures, many=True)
+        return Response(serializer.data)
+
+    # ✅ Restaurer un document depuis la corbeille
+    @action(detail=True, methods=['post'])
+    def restaurer(self, request, pk=None):
+        # Chercher dans TOUS les documents (y compris supprimés)
+        try:
+            facture = Facture.objects.get(pk=pk)
+        except Facture.DoesNotExist:
+            return Response({'error': 'Document introuvable.'}, status=status.HTTP_404_NOT_FOUND)
+        if not facture.is_deleted:
+            return Response({'error': 'Ce document n\'est pas dans la corbeille.'}, status=status.HTTP_400_BAD_REQUEST)
+        facture.restaurer()
+        return Response(FactureSerializer(facture).data)
+
+    # ✅ Suppression définitive depuis la corbeille
+    @action(detail=True, methods=['delete'])
+    def supprimer_definitif(self, request, pk=None):
+        try:
+            facture = Facture.objects.get(pk=pk)
+        except Facture.DoesNotExist:
+            return Response({'error': 'Document introuvable.'}, status=status.HTTP_404_NOT_FOUND)
+        facture.delete()
+        return Response(status=status.HTTP_204_NO_CONTENT)
 
     @action(detail=True, methods=['post'])
     def valider(self, request, pk=None):
@@ -75,6 +111,7 @@ class FactureViewSet(viewsets.ModelViewSet):
             type_doc            = 'FACTURE',
             statut              = 'ENVOYE',
             proforma_origine    = proforma,
+            date_creation       = proforma.date_creation,
             validite_jours      = proforma.validite_jours,
             termes_paiement     = proforma.termes_paiement,
             remise_pct          = proforma.remise_pct,
@@ -125,7 +162,6 @@ class FactureViewSet(viewsets.ModelViewSet):
     def generer_pdf(self, request, pk=None):
         facture = self.get_object()
         try:
-            # ✅ Toujours supprimer l'ancien et régénérer
             if facture.pdf_file:
                 facture.pdf_file.delete(save=False)
             generer_pdf_facture(facture)
@@ -143,7 +179,6 @@ class FactureViewSet(viewsets.ModelViewSet):
     def pdf(self, request, pk=None):
         facture = self.get_object()
         try:
-            # ✅ Toujours régénérer le PDF pour avoir la version à jour
             if facture.pdf_file:
                 facture.pdf_file.delete(save=False)
             generer_pdf_facture(facture)

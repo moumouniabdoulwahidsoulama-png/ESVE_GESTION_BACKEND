@@ -31,6 +31,10 @@ class Facture(models.Model):
     type_doc            = models.CharField(max_length=10, choices=TYPE_CHOICES, default='PROFORMA')
     statut              = models.CharField(max_length=10, choices=STATUT_CHOICES, default='BROUILLON')
 
+    # ✅ SOFT DELETE — corbeille
+    is_deleted          = models.BooleanField(default=False)
+    date_deleted        = models.DateTimeField(null=True, blank=True)
+
     # Relations
     client              = models.ForeignKey(Client, on_delete=models.PROTECT, related_name='factures')
     proforma_origine    = models.ForeignKey(
@@ -39,12 +43,12 @@ class Facture(models.Model):
                             related_name='factures_generees'
                           )
 
-    # Dates
-    date_creation       = models.DateField(auto_now_add=True)
+    # Dates — ✅ date_creation éditable (plus auto_now_add)
+    date_creation       = models.DateField(default=date.today)
     date_modification   = models.DateTimeField(auto_now=True)
     validite_jours      = models.IntegerField(default=30)
 
-    # Termes de paiement ← NOUVEAU
+    # Termes de paiement
     termes_paiement     = models.CharField(
                             max_length=50,
                             choices=TERMES_PAIEMENT_CHOICES,
@@ -85,6 +89,25 @@ class Facture(models.Model):
 
     def __str__(self):
         return f"{self.numero} — {self.client.nom_entreprise}"
+
+    # ✅ Soft delete — envoie en corbeille
+    def soft_delete(self):
+        from django.utils import timezone
+        self.is_deleted   = True
+        self.date_deleted = timezone.now()
+        # ✅ Si c'est une FACTURE issue d'une PROFORMA → remettre la proforma en ENVOYE
+        if self.type_doc == 'FACTURE' and self.proforma_origine:
+            proforma = self.proforma_origine
+            if proforma.statut == 'VALIDE':
+                proforma.statut = 'ENVOYE'
+                proforma.save(update_fields=['statut'])
+        self.save(update_fields=['is_deleted', 'date_deleted'])
+
+    # ✅ Restaurer depuis la corbeille
+    def restaurer(self):
+        self.is_deleted   = False
+        self.date_deleted = None
+        self.save(update_fields=['is_deleted', 'date_deleted'])
 
     def calculer_totaux(self):
         total_brut         = sum(ligne.total_ht for ligne in self.lignes.all())

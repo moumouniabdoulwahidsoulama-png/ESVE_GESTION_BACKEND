@@ -17,6 +17,10 @@ class BonCommande(models.Model):
     numero                       = models.CharField(max_length=50, unique=True, blank=True)
     statut                       = models.CharField(max_length=15, choices=STATUT_CHOICES, default='BROUILLON')
 
+    # ✅ SOFT DELETE — corbeille
+    is_deleted                   = models.BooleanField(default=False)
+    date_deleted                 = models.DateTimeField(null=True, blank=True)
+
     # Fournisseur
     fournisseur_nom              = models.CharField(max_length=200)
     fournisseur_contact          = models.CharField(max_length=100, blank=True)
@@ -37,28 +41,28 @@ class BonCommande(models.Model):
     termes_livraison             = models.CharField(max_length=200, blank=True)
     delais_livraison             = models.CharField(max_length=100, blank=True)
 
-    # Dates
-    date_commande                = models.DateField(auto_now_add=True)
+    # Dates — ✅ date_commande éditable (plus auto_now_add)
+    date_commande                = models.DateField(default=date.today)
     date_modification            = models.DateTimeField(auto_now=True)
     date_livraison_prev          = models.DateField(null=True, blank=True)
-    validite_jours               = models.IntegerField(default=30)   # ← AJOUTÉ
+    validite_jours               = models.IntegerField(default=30)
 
     # Options de calcul
-    appliquer_remise             = models.BooleanField(default=False)   # ← AJOUTÉ
+    appliquer_remise             = models.BooleanField(default=False)
     appliquer_tva                = models.BooleanField(default=False)
     appliquer_retenue            = models.BooleanField(default=False)
     appliquer_bic                = models.BooleanField(default=False)
-    appliquer_transport          = models.BooleanField(default=False)   # ← AJOUTÉ
+    appliquer_transport          = models.BooleanField(default=False)
 
     # Remise
-    remise_pct                   = models.DecimalField(max_digits=5, decimal_places=2, default=0)   # ← AJOUTÉ
+    remise_pct                   = models.DecimalField(max_digits=5, decimal_places=2, default=0)
 
     # Transport (montant manuel)
-    montant_transport            = models.DecimalField(max_digits=14, decimal_places=2, default=0)  # ← AJOUTÉ
+    montant_transport            = models.DecimalField(max_digits=14, decimal_places=2, default=0)
 
     # Montants calculés
-    total_ht_brut                = models.DecimalField(max_digits=14, decimal_places=2, default=0)  # ← AJOUTÉ
-    montant_remise               = models.DecimalField(max_digits=14, decimal_places=2, default=0)  # ← AJOUTÉ
+    total_ht_brut                = models.DecimalField(max_digits=14, decimal_places=2, default=0)
+    montant_remise               = models.DecimalField(max_digits=14, decimal_places=2, default=0)
     total_ht                     = models.DecimalField(max_digits=14, decimal_places=2, default=0)
     tva_18pct                    = models.DecimalField(max_digits=14, decimal_places=2, default=0)
     retenue_5pct                 = models.DecimalField(max_digits=14, decimal_places=2, default=0)
@@ -78,11 +82,23 @@ class BonCommande(models.Model):
     def __str__(self):
         return f"{self.numero} — {self.fournisseur_nom}"
 
+    # ✅ Soft delete — envoie en corbeille
+    def soft_delete(self):
+        from django.utils import timezone
+        self.is_deleted   = True
+        self.date_deleted = timezone.now()
+        self.save(update_fields=['is_deleted', 'date_deleted'])
+
+    # ✅ Restaurer depuis la corbeille
+    def restaurer(self):
+        self.is_deleted   = False
+        self.date_deleted = None
+        self.save(update_fields=['is_deleted', 'date_deleted'])
+
     def calculer_totaux(self):
         total_brut         = sum(ligne.total_ht for ligne in self.lignes.all())
         self.total_ht_brut = total_brut
 
-        # Remise
         if self.appliquer_remise and self.remise_pct > 0:
             self.montant_remise = round(total_brut * self.remise_pct / Decimal('100'), 2)
         else:
@@ -91,19 +107,12 @@ class BonCommande(models.Model):
         total_ht       = total_brut - self.montant_remise
         self.total_ht  = total_ht
 
-        # TVA
         self.tva_18pct    = round(total_ht * Decimal('0.18'), 2) if self.appliquer_tva     else Decimal('0')
-
-        # Retenue
         self.retenue_5pct = round(total_ht * Decimal('0.05'), 2) if self.appliquer_retenue else Decimal('0')
-
-        # BIC 2% = 2% de (HT + TVA)
         self.bic_2pct     = round((total_ht + self.tva_18pct) * Decimal('0.02'), 2) if self.appliquer_bic else Decimal('0')
 
-        # Transport
         transport = self.montant_transport if self.appliquer_transport else Decimal('0')
 
-        # Total net
         self.total_net = round(
             total_ht + self.tva_18pct - self.retenue_5pct - self.bic_2pct + transport, 2
         )

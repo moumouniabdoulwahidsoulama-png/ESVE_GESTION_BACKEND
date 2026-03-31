@@ -23,33 +23,53 @@ class BonCommandeViewSet(viewsets.ModelViewSet):
                 return BonCommande.objects.none()
         except Exception:
             pass
-        return BonCommande.objects.all()
+        # ✅ Par défaut : n'afficher que les non supprimés
+        return BonCommande.objects.filter(is_deleted=False)
 
     def get_serializer_class(self):
         if self.action in ['create', 'update', 'partial_update']:
             return BonCommandeCreateSerializer
         return BonCommandeSerializer
 
-    # ✅ Override update — supprime l'ancien PDF après modification
-    def update(self, request, *args, **kwargs):
-        response = super().update(request, *args, **kwargs)
-        try:
-            bon = self.get_object()
-            if bon.pdf_file:
-                bon.pdf_file.delete(save=True)
-        except Exception:
-            pass
-        return response
+    # ✅ Override destroy — soft delete au lieu de vraie suppression
+    def destroy(self, request, *args, **kwargs):
+        bon = self.get_object()
+        bon.soft_delete()
+        return Response(status=status.HTTP_204_NO_CONTENT)
 
-    def partial_update(self, request, *args, **kwargs):
-        kwargs['partial'] = True
-        return self.update(request, *args, **kwargs)
+    # ✅ Corbeille — liste des bons supprimés
+    @action(detail=False, methods=['get'])
+    def corbeille(self, request):
+        bons = BonCommande.objects.filter(is_deleted=True)
+        serializer = BonCommandeSerializer(bons, many=True)
+        return Response(serializer.data)
+
+    # ✅ Restaurer un bon depuis la corbeille
+    @action(detail=True, methods=['post'])
+    def restaurer(self, request, pk=None):
+        try:
+            bon = BonCommande.objects.get(pk=pk)
+        except BonCommande.DoesNotExist:
+            return Response({'error': 'Document introuvable.'}, status=status.HTTP_404_NOT_FOUND)
+        if not bon.is_deleted:
+            return Response({'error': 'Ce document n\'est pas dans la corbeille.'}, status=status.HTTP_400_BAD_REQUEST)
+        bon.restaurer()
+        return Response(BonCommandeSerializer(bon).data)
+
+    # ✅ Suppression définitive depuis la corbeille
+    @action(detail=True, methods=['delete'])
+    def supprimer_definitif(self, request, pk=None):
+        try:
+            bon = BonCommande.objects.get(pk=pk)
+        except BonCommande.DoesNotExist:
+            return Response({'error': 'Document introuvable.'}, status=status.HTTP_404_NOT_FOUND)
+        bon.delete()
+        return Response(status=status.HTTP_204_NO_CONTENT)
 
     @action(detail=True, methods=['post'])
     def generer_pdf(self, request, pk=None):
         bon = self.get_object()
         try:
-            # ✅ Toujours supprimer l'ancien et régénérer
             if bon.pdf_file:
                 bon.pdf_file.delete(save=False)
             generer_pdf_bon_commande(bon)
@@ -67,7 +87,6 @@ class BonCommandeViewSet(viewsets.ModelViewSet):
     def pdf(self, request, pk=None):
         bon = self.get_object()
         try:
-            # ✅ Toujours régénérer le PDF pour avoir la version à jour
             if bon.pdf_file:
                 bon.pdf_file.delete(save=False)
             generer_pdf_bon_commande(bon)
