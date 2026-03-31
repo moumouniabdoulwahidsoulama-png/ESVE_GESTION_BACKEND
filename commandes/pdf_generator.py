@@ -196,7 +196,7 @@ def generer_pdf_bon_commande(bon):
             Paragraph(ligne.reference_client or '', style_normal),
             Paragraph(ligne.reference_fournisseur or '', style_normal),
             Paragraph(f'{int(ligne.prix_unitaire_ht):,}'.replace(',', ' '), style_right),
-            Paragraph(f'{ligne.quantite:.2f}', style_right),
+            Paragraph(f'{int(ligne.quantite) if ligne.quantite == int(ligne.quantite) else ligne.quantite}', style_right),
             Paragraph(f'{int(ligne.total_ht):,}'.replace(',', ' '), style_right),
             Paragraph(ligne.delais or '', style_normal),
         ])
