@@ -14,9 +14,16 @@ NOIR   = colors.HexColor('#1A1A2E')
 
 
 def _img(filename):
+    """Cherche l'image dans tous les dossiers possibles."""
+    base = os.path.dirname(__file__)
     candidates = [
-        os.path.join(os.path.dirname(__file__), '..', 'static', filename),
-        os.path.join(os.path.dirname(__file__), filename),
+        os.path.join(base, '..', 'static', filename),       # ../static/
+        os.path.join(base, '..', 'staticfiles', filename),  # ../staticfiles/
+        os.path.join(base, 'static', filename),              # ./static/
+        os.path.join(base, filename),                        # ./
+        os.path.join('/app', 'static', filename),            # /app/static/ (Railway)
+        os.path.join('/app', 'staticfiles', filename),       # /app/staticfiles/ (Railway)
+        os.path.join('/app', filename),                      # /app/ (Railway)
     ]
     for p in candidates:
         p = os.path.normpath(p)
@@ -213,11 +220,11 @@ def generer_pdf_offre(data: dict) -> bytes:
         # ── Grille photos produits (C9) après D2 ─────────────────────────────
         prod_p = _img('esve_products.png')
         if prod_p:
-            els.append(Spacer(1, 0.5*cm))
+            els.append(Spacer(1, 0.2*cm))
             els.append(RLImage(prod_p, width=18*cm, height=12*cm))
-            els.append(Spacer(1, 0.6*cm))
+            els.append(Spacer(1, 0.2*cm))
         else:
-            els.append(Spacer(1, 0.4*cm))
+            els.append(Spacer(1, 0.2*cm))
 
         # D3 + D4
         els.append(Paragraph(T['d3_titre'], s_titre))
@@ -229,7 +236,7 @@ def generer_pdf_offre(data: dict) -> bytes:
         # ── Image terrain (C8) après D4 ───────────────────────────────────────
         field_p = _img('esve_field.png')
         if field_p:
-            els.append(Spacer(1, 0.5*cm))
+            els.append(Spacer(1, 0.2*cm))
             tbl = Table([[RLImage(field_p, width=18*cm, height=9*cm)]],
                         colWidths=[18*cm])
             tbl.setStyle(TableStyle([('ALIGN', (0,0), (-1,-1), 'CENTER')]))
