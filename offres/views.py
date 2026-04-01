@@ -9,9 +9,30 @@ from .pdf_generator import generer_pdf_offre
 
 
 class OffreServiceViewSet(viewsets.ModelViewSet):
-    queryset           = OffreService.objects.all()
     serializer_class   = OffreServiceSerializer
     permission_classes = [IsAuthenticated]
+
+    def get_queryset(self):
+        show_deleted = self.request.query_params.get('corbeille', '0') == '1'
+        return OffreService.objects.filter(is_deleted=show_deleted)
+
+    # Soft delete au lieu de vraiment supprimer
+    def destroy(self, request, *args, **kwargs):
+        offre = self.get_object()
+        offre.soft_delete()
+        return Response({'success': 'Offre déplacée dans la corbeille.'})
+
+    @action(detail=True, methods=['post'], url_path='restaurer')
+    def restaurer(self, request, pk=None):
+        offre = self.get_object()
+        offre.restore()
+        return Response({'success': 'Offre restaurée.'})
+
+    @action(detail=True, methods=['delete'], url_path='supprimer_definitif')
+    def supprimer_definitif(self, request, pk=None):
+        offre = self.get_object()
+        offre.delete()
+        return Response({'success': 'Offre supprimée définitivement.'})
 
     @action(detail=True, methods=['get'])
     def pdf(self, request, pk=None):

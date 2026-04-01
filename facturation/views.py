@@ -55,15 +55,13 @@ class FactureViewSet(viewsets.ModelViewSet):
         return Response({'success': 'Facture déplacée dans la corbeille.'},
                         status=status.HTTP_200_OK)
 
-    # ✅ Restaurer depuis la corbeille
-    @action(detail=True, methods=['post'])
+    @action(detail=True, methods=['post'], url_path='restaurer')
     def restaurer(self, request, pk=None):
         facture = self.get_object()
         facture.restore()
         return Response({'success': f'{facture.numero} restaurée.'})
 
-    # ✅ Suppression définitive
-    @action(detail=True, methods=['delete'])
+    @action(detail=True, methods=['delete'], url_path='supprimer_definitif')
     def supprimer_definitif(self, request, pk=None):
         facture = self.get_object()
         if facture.pdf_file:

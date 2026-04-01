@@ -2,7 +2,8 @@ from reportlab.lib.pagesizes import A4
 from reportlab.lib import colors
 from reportlab.lib.units import cm
 from reportlab.platypus import (SimpleDocTemplate, Table, TableStyle,
-                                 Paragraph, Spacer, Image as RLImage, HRFlowable)
+                                 Paragraph, Spacer, Image as RLImage,
+                                 HRFlowable, PageBreak)
 from reportlab.lib.styles import ParagraphStyle
 from reportlab.lib.enums import TA_CENTER, TA_RIGHT, TA_LEFT, TA_JUSTIFY
 from io import BytesIO
@@ -10,20 +11,20 @@ import os
 
 ORANGE = colors.HexColor('#D4A017')
 GRIS   = colors.HexColor('#555555')
-NOIR   = colors.HexColor('#1A1A2E')
+NOIR   = colors.HexColor('#222222')
+
+W, H = A4
 
 
 def _img(filename):
-    """Cherche l'image dans tous les dossiers possibles."""
     base = os.path.dirname(__file__)
     candidates = [
-        os.path.join(base, '..', 'static', filename),       # ../static/
-        os.path.join(base, '..', 'staticfiles', filename),  # ../staticfiles/
-        os.path.join(base, 'static', filename),              # ./static/
-        os.path.join(base, filename),                        # ./
-        os.path.join('/app', 'static', filename),            # /app/static/ (Railway)
-        os.path.join('/app', 'staticfiles', filename),       # /app/staticfiles/ (Railway)
-        os.path.join('/app', filename),                      # /app/ (Railway)
+        os.path.join(base, '..', 'static', filename),
+        os.path.join(base, '..', 'staticfiles', filename),
+        os.path.join(base, filename),
+        os.path.join('/app', 'static', filename),
+        os.path.join('/app', 'staticfiles', filename),
+        os.path.join('/app', filename),
     ]
     for p in candidates:
         p = os.path.normpath(p)
@@ -36,7 +37,7 @@ TEXTES = {
     'fr': {
         'objet_label': 'Objet :',
         'objet_texte': 'Offre de services, présentation de notre société ESVE – Ecology Smart Vision Equipement',
-        'salutation': 'Madame, Monsieur,',
+        'salutation':  'Madame, Monsieur,',
         'intro': ("Nous avons le plaisir de vous adresser la présente lettre afin de vous présenter notre entreprise, "
                   "<b>ESVE – Ecology Smart Vision Equipement</b>, spécialisée dans la fourniture de solutions techniques "
                   "à fortes valeurs ajoutées et à destination des secteurs des mines, des carrières, du BTP et des industries."),
@@ -77,7 +78,7 @@ TEXTES = {
     'en': {
         'objet_label': 'Subject:',
         'objet_texte': 'Service Offer — Presentation of ESVE – Ecology Smart Vision Equipement',
-        'salutation': 'Dear Sir/Madam,',
+        'salutation':  'Dear Sir/Madam,',
         'intro': ("We are pleased to present our company, <b>ESVE – Ecology Smart Vision Equipement</b>, specialised in "
                   "the supply of high-value technical solutions for the mining, quarrying, construction and industrial sectors."),
         'p1': ("Based in Burkina Faso, ESVE's mission is to help industrial operators optimise their productivity, reduce "
@@ -86,7 +87,7 @@ TEXTES = {
         'p2': ("To guarantee the reliability and performance of our services, ESVE works with a panel of the best local and "
                "international suppliers, rigorously selected for their expertise, innovation and compliance with international standards."),
         'p3': ("Fully aware of the technical, logistical and environmental challenges of the Burkinabe mining sector, ESVE "
-               "positions itself as a trusted strategic partner, delivering robust, sustainable solutions. Thanks to local expertise, "
+               "positions itself as a trusted strategic partner delivering robust, sustainable solutions. Thanks to local expertise, "
                "we offer tailor-made support meeting requirements for efficiency, profitability and social responsibility."),
         'p4': ("As part of the development of our activities, we request to be registered in your supplier database so that "
                "we may be consulted for any request or need related to our areas of expertise."),
@@ -94,160 +95,178 @@ TEXTES = {
         'domaines': "Our main areas of expertise:",
         'd1_titre': "Supply of Ground Engaging Tools (G.E.T. / O.A.S) and Undercarriage Components (U.C / T.D.R)",
         'd1_texte': ("ESVE offers a wide range of teeth, adapters, shrouds, blades and cutting edges compatible with Caterpillar, "
-                     "Komatsu, Hensley and ESCO equipment for mining, quarrying and civil engineering."),
+                     "Komatsu, Hensley and ESCO equipment for mining, quarrying and civil engineering, "
+                     "as well as undercarriage components for mobile equipment."),
         'd2_titre': "Supply of Mechanical Parts and Components",
         'd2_texte': ("We hold a portfolio of spare parts and mechanical components (engines, gearboxes, torque converters, "
-                     "hydraulic pumps, cylinders…), new or reconditioned, for Caterpillar, Komatsu and Volvo equipment."),
+                     "hydraulic pumps, cylinders, hydraulic systems…), new or reconditioned, "
+                     "for Caterpillar, Komatsu and Volvo equipment."),
         'd3_titre': "Industrial and Construction Equipment Rental",
-        'd3_texte': "To meet the temporary or urgent needs of your sites: excavators, loaders, generators, compressors, etc.",
+        'd3_texte': ("To meet the temporary or urgent needs of your sites, we provide a fleet of equipment for rental: "
+                     "excavators, loaders, generators, compressors, etc."),
         'd4_titre': "Technical Service and Support",
-        'd4_texte': ("Our qualified teams provide installation, maintenance and technical monitoring with a reactive "
-                     "after-sales service close to your operating sites."),
+        'd4_texte': ("Our qualified teams provide installation, maintenance and technical monitoring of the equipment supplied, "
+                     "with a reactive after-sales service close to your operating sites."),
         'footer_left':  "ECOLOGY SMART VISION EQUIPEMENT\nS/C 04 BP 398 OUAGA 04 — Secteur 42 OUAGADOUGOU\n(+226) 05 56 25 92 — direction@svequipement.com",
         'footer_right': "RIB: BF148-01001-077355324101-26\nRCCM: BF-OUA-01-2025-B13-08308\nIFU: 00272062K — Tax regime: RSI",
     }
 }
 
+MARGIN_L = 1.8*cm
+MARGIN_R = 1.8*cm
+MARGIN_T = 1.5*cm
+MARGIN_B = 2.8*cm
+CONTENT_W = W - MARGIN_L - MARGIN_R  # ~17.4cm
+
+
+def _draw_header(canvas, logo_p):
+    """Dessine l'en-tête sur chaque page (logo gauche + slogan centre)."""
+    canvas.saveState()
+    y_top = H - MARGIN_T
+
+    if logo_p and os.path.exists(logo_p):
+        logo_h = 3.2*cm
+        logo_w = 3.2*cm
+        canvas.drawImage(logo_p, MARGIN_L, y_top - logo_h,
+                         width=logo_w, height=logo_h,
+                         preserveAspectRatio=True, mask='auto')
+
+    # Slogan centré
+    canvas.setFont('Helvetica-Bold', 20)
+    canvas.setFillColor(ORANGE)
+    canvas.drawCentredString(W / 2, y_top - 2.0*cm, 'The Supplier You Need')
+
+    # Ligne sous l'en-tête
+    canvas.setStrokeColor(ORANGE)
+    canvas.setLineWidth(1.5)
+    line_y = y_top - 3.4*cm
+    canvas.line(MARGIN_L, line_y, W - MARGIN_R, line_y)
+
+    canvas.restoreState()
+    return line_y  # position y après la ligne
+
+
+def _draw_footer(canvas, T, is_last):
+    """Dessine le footer 2 colonnes uniquement sur la dernière page."""
+    if not is_last:
+        return
+    canvas.saveState()
+    y = 1.8*cm
+    canvas.setStrokeColor(GRIS)
+    canvas.setLineWidth(0.4)
+    canvas.line(MARGIN_L, y + 0.5*cm, W - MARGIN_R, y + 0.5*cm)
+
+    # Colonne gauche
+    canvas.setFont('Helvetica', 7.5)
+    canvas.setFillColor(GRIS)
+    for i, line in enumerate(T['footer_left'].split('\n')):
+        canvas.drawString(MARGIN_L, y - i * 0.32*cm, line)
+
+    # Colonne droite
+    for i, line in enumerate(T['footer_right'].split('\n')):
+        canvas.drawRightString(W - MARGIN_R, y - i * 0.32*cm, line)
+
+    canvas.restoreState()
+
 
 def generer_pdf_offre(data: dict) -> bytes:
-    langue = data.get('langue', 'fr')
-    T      = TEXTES[langue]
-    buf    = BytesIO()
+    langue  = data.get('langue', 'fr')
+    T       = TEXTES[langue]
+    buf     = BytesIO()
+    logo_p  = _img('logo-esve.jpg') or _img('logo-esve.png')
+    prod_p  = _img('esve_products.png')
+    field_p = _img('esve_field.png')
 
-    # ── Styles ────────────────────────────────────────────────────────────────
-    s_normal = ParagraphStyle('n',  fontSize=10, leading=15, alignment=TA_JUSTIFY, spaceAfter=8)
-    s_bold   = ParagraphStyle('b',  fontSize=10, leading=15, alignment=TA_JUSTIFY,
-                               fontName='Helvetica-Bold', spaceAfter=8)
-    s_right  = ParagraphStyle('r',  fontSize=9,  leading=13, alignment=TA_RIGHT, textColor=GRIS)
-    s_titre  = ParagraphStyle('t',  fontSize=11, leading=14, fontName='Helvetica-Bold',
-                               textColor=ORANGE, spaceAfter=6)
-    s_objet  = ParagraphStyle('o',  fontSize=10, leading=14, fontName='Helvetica-Bold', spaceAfter=10)
-    s_footer = ParagraphStyle('f',  fontSize=7.5, leading=11, alignment=TA_LEFT, textColor=GRIS)
-    s_footer_r = ParagraphStyle('fr', fontSize=7.5, leading=11, alignment=TA_RIGHT, textColor=GRIS)
-    s_slogan = ParagraphStyle('sl', fontSize=20, leading=24, textColor=ORANGE,
-                               fontName='Helvetica-Bold', alignment=TA_CENTER)
+    # Styles
+    s_n  = ParagraphStyle('n',  fontSize=10, leading=15, alignment=TA_JUSTIFY,
+                           spaceAfter=7, fontName='Helvetica')
+    s_b  = ParagraphStyle('b',  fontSize=10, leading=15, alignment=TA_JUSTIFY,
+                           fontName='Helvetica-Bold', spaceAfter=7)
+    s_r  = ParagraphStyle('r',  fontSize=9,  leading=13, alignment=TA_RIGHT,
+                           textColor=GRIS, fontName='Helvetica')
+    s_t  = ParagraphStyle('t',  fontSize=11, leading=14, fontName='Helvetica-Bold',
+                           textColor=ORANGE, spaceAfter=5)
+    s_o  = ParagraphStyle('o',  fontSize=10, leading=14, fontName='Helvetica-Bold',
+                           spaceAfter=8)
+
+    # Espace sous l'en-tête (logo 3.2cm + ligne 3.4cm + marge)
+    HEADER_SPACE = 3.8*cm
 
     total_pages = [0]
 
-    def draw_footer(canvas, doc):
-        """Footer 2 colonnes uniquement sur la dernière page."""
-        canvas.saveState()
-        if doc.page == total_pages[0]:
-            w = A4[0]
-            y = 1.2*cm
+    def on_page(canvas, doc):
+        _draw_header(canvas, logo_p)
+        _draw_footer(canvas, T, doc.page == total_pages[0])
 
-            # Ligne séparatrice
-            canvas.setStrokeColor(GRIS)
-            canvas.setLineWidth(0.5)
-            canvas.line(1.5*cm, y + 0.8*cm, w - 1.5*cm, y + 0.8*cm)
-
-            # Colonne gauche
-            p_left = Paragraph(T['footer_left'].replace('\n', '<br/>'), s_footer)
-            p_left.wrapOn(canvas, 9*cm, 2*cm)
-            p_left.drawOn(canvas, 1.5*cm, y - 0.4*cm)
-
-            # Colonne droite
-            p_right = Paragraph(T['footer_right'].replace('\n', '<br/>'), s_footer_r)
-            p_right.wrapOn(canvas, 9*cm, 2*cm)
-            p_right.drawOn(canvas, w - 10.5*cm, y - 0.4*cm)
-
-        canvas.restoreState()
-
+    # ── STORY ────────────────────────────────────────────────────────────────
     def make_story():
         els = []
+        els.append(Spacer(1, HEADER_SPACE))
 
-        # ── EN-TÊTE : Logo à gauche + Slogan centré ──────────────────────────
-        logo_p = _img('logo-esve.jpg') or _img('logo-esve.png')
-        slogan = Paragraph('The Supplier You Need', s_slogan)
-
-        if logo_p:
-            hdr = Table(
-                [[RLImage(logo_p, 3.5*cm, 3.5*cm), slogan, '']],
-                colWidths=[4.2*cm, 9.6*cm, 4.2*cm]
-            )
-        else:
-            hdr = Table([[slogan]], colWidths=[18*cm])
-
-        hdr.setStyle(TableStyle([
-            ('VALIGN',        (0,0), (-1,-1), 'MIDDLE'),
-            ('ALIGN',         (0,0), (0,0),   'LEFT'),    # logo à gauche
-            ('ALIGN',         (1,0), (1,0),   'CENTER'),  # slogan au centre
-            ('LINEBELOW',     (0,0), (-1,-1), 1.5, ORANGE),
-            ('BOTTOMPADDING', (0,0), (-1,-1), 12),
-            ('TOPPADDING',    (0,0), (-1,-1), 4),
-        ]))
-        els.append(hdr)
-        els.append(Spacer(1, 0.8*cm))
-
-        # ── Destinataires à droite ─────────────────────────────────────────────
+        # Destinataires à droite
         soc = (data.get('societe') or '').strip()
         if soc:
-            els.append(Paragraph(f'<b>{soc}</b>', s_right))
+            els.append(Paragraph(f'<b>{soc}</b>', s_r))
         for d in (data.get('destinataires') or [])[:3]:
             nom = (d.get('nom') or '').strip()
             fn  = (d.get('fonction') or '').strip()
             if nom or fn:
                 els.append(Paragraph(
-                    (f'<b>{nom}</b>' if nom else '') + (f'  –  {fn}' if fn else ''), s_right))
-        els.append(Spacer(1, 0.6*cm))
+                    (f'<b>{nom}</b>' if nom else '') + (f'  –  {fn}' if fn else ''), s_r))
+        els.append(Spacer(1, 0.5*cm))
 
-        # ── Corps lettre ───────────────────────────────────────────────────────
-        els.append(Paragraph(f'{T["objet_label"]} <b>{T["objet_texte"]}</b>', s_objet))
-        els.append(Paragraph(T['salutation'], s_bold))
-        els.append(Spacer(1, 0.2*cm))
+        # Corps lettre page 1
+        els.append(Paragraph(f'{T["objet_label"]} <b>{T["objet_texte"]}</b>', s_o))
+        els.append(Paragraph(T['salutation'], s_b))
+        els.append(Spacer(1, 0.15*cm))
         for k in ['intro', 'p1', 'p2', 'p3', 'p4']:
-            els.append(Paragraph(T[k], s_normal))
+            els.append(Paragraph(T[k], s_n))
         custom = (data.get('texte_custom') or '').strip()
         if custom:
-            els.append(Paragraph(custom, s_normal))
-        els.append(Spacer(1, 0.4*cm))
-        els.append(Paragraph(T['attente'], s_normal))
-        els.append(Spacer(1, 1.0*cm))
-
-        # ── Ligne séparatrice + Domaines ──────────────────────────────────────
-        els.append(HRFlowable(width='100%', thickness=0.8, color=GRIS))
-        els.append(Spacer(1, 0.4*cm))
-        els.append(Paragraph(f'<b>{T["domaines"]}</b>', s_bold))
+            els.append(Paragraph(custom, s_n))
         els.append(Spacer(1, 0.3*cm))
+        els.append(Paragraph(T['attente'], s_n))
 
-        # D1 + D2
-        els.append(Paragraph(T['d1_titre'], s_titre))
-        els.append(Paragraph(T['d1_texte'], s_normal))
+        # ── PAGE 2 ────────────────────────────────────────────────────────────
+        els.append(PageBreak())
+        els.append(Spacer(1, HEADER_SPACE))
+
+        els.append(Paragraph(f'<b>{T["domaines"]}</b>', s_b))
         els.append(Spacer(1, 0.2*cm))
-        els.append(Paragraph(T['d2_titre'], s_titre))
-        els.append(Paragraph(T['d2_texte'], s_normal))
 
-        # ── Grille photos produits (C9) après D2 ─────────────────────────────
-        prod_p = _img('esve_products.png')
+        els.append(Paragraph(T['d1_titre'], s_t))
+        els.append(Paragraph(T['d1_texte'], s_n))
+        els.append(Spacer(1, 0.15*cm))
+        els.append(Paragraph(T['d2_titre'], s_t))
+        els.append(Paragraph(T['d2_texte'], s_n))
+
+        # Grille photos produits (C9) — en bas de page 2
         if prod_p:
-            els.append(Spacer(1, 0.2*cm))
-            els.append(RLImage(prod_p, width=18*cm, height=12*cm))
-            els.append(Spacer(1, 0.2*cm))
-        else:
-            els.append(Spacer(1, 0.2*cm))
+            els.append(Spacer(1, 0.25*cm))
+            els.append(RLImage(prod_p, width=CONTENT_W, height=12.5*cm))
 
-        # D3 + D4
-        els.append(Paragraph(T['d3_titre'], s_titre))
-        els.append(Paragraph(T['d3_texte'], s_normal))
-        els.append(Spacer(1, 0.2*cm))
-        els.append(Paragraph(T['d4_titre'], s_titre))
-        els.append(Paragraph(T['d4_texte'], s_normal))
+        # ── PAGE 3 ────────────────────────────────────────────────────────────
+        els.append(PageBreak())
+        els.append(Spacer(1, HEADER_SPACE))
 
-        # ── Image terrain (C8) après D4 ───────────────────────────────────────
-        field_p = _img('esve_field.png')
+        els.append(Paragraph(T['d3_titre'], s_t))
+        els.append(Paragraph(T['d3_texte'], s_n))
+        els.append(Spacer(1, 0.15*cm))
+        els.append(Paragraph(T['d4_titre'], s_t))
+        els.append(Paragraph(T['d4_texte'], s_n))
+
+        # Image terrain (C8) — collée juste sous D4, avant le footer
         if field_p:
-            els.append(Spacer(1, 0.2*cm))
-            tbl = Table([[RLImage(field_p, width=18*cm, height=9*cm)]],
-                        colWidths=[18*cm])
-            tbl.setStyle(TableStyle([('ALIGN', (0,0), (-1,-1), 'CENTER')]))
-            els.append(tbl)
+            els.append(Spacer(1, 0.3*cm))
+            els.append(RLImage(field_p, width=CONTENT_W, height=10*cm))
 
         return els
 
     # Pré-build pour compter les pages
     tmp  = BytesIO()
-    dtmp = SimpleDocTemplate(tmp, pagesize=A4, rightMargin=1.5*cm, leftMargin=1.5*cm,
-                              topMargin=1.5*cm, bottomMargin=3*cm)
+    dtmp = SimpleDocTemplate(tmp, pagesize=A4,
+                             rightMargin=MARGIN_R, leftMargin=MARGIN_L,
+                             topMargin=MARGIN_T, bottomMargin=MARGIN_B)
     class PC:
         count = 0
         def __call__(self, c, d): self.count = d.page
@@ -256,7 +275,8 @@ def generer_pdf_offre(data: dict) -> bytes:
     total_pages[0] = pc.count
 
     # Build final
-    doc = SimpleDocTemplate(buf, pagesize=A4, rightMargin=1.5*cm, leftMargin=1.5*cm,
-                             topMargin=1.5*cm, bottomMargin=3*cm)
-    doc.build(make_story(), onFirstPage=draw_footer, onLaterPages=draw_footer)
+    doc = SimpleDocTemplate(buf, pagesize=A4,
+                            rightMargin=MARGIN_R, leftMargin=MARGIN_L,
+                            topMargin=MARGIN_T, bottomMargin=MARGIN_B)
+    doc.build(make_story(), onFirstPage=on_page, onLaterPages=on_page)
     return buf.getvalue()
