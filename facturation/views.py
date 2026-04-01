@@ -57,13 +57,21 @@ class FactureViewSet(viewsets.ModelViewSet):
 
     @action(detail=True, methods=['post'], url_path='restaurer')
     def restaurer(self, request, pk=None):
-        facture = self.get_object()
+        # ✅ Cherche dans TOUS les objets y compris supprimés
+        try:
+            facture = Facture.objects.get(pk=pk)
+        except Facture.DoesNotExist:
+            return Response({'error': 'Facture introuvable'}, status=404)
         facture.restore()
         return Response({'success': f'{facture.numero} restaurée.'})
 
     @action(detail=True, methods=['delete'], url_path='supprimer_definitif')
     def supprimer_definitif(self, request, pk=None):
-        facture = self.get_object()
+        # ✅ Cherche dans TOUS les objets y compris supprimés
+        try:
+            facture = Facture.objects.get(pk=pk)
+        except Facture.DoesNotExist:
+            return Response({'error': 'Facture introuvable'}, status=404)
         if facture.pdf_file:
             facture.pdf_file.delete(save=False)
         facture.delete()

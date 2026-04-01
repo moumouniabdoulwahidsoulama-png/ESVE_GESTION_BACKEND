@@ -39,13 +39,19 @@ class BonCommandeViewSet(viewsets.ModelViewSet):
 
     @action(detail=True, methods=['post'], url_path='restaurer')
     def restaurer(self, request, pk=None):
-        bon = self.get_object()
+        try:
+            bon = BonCommande.objects.get(pk=pk)
+        except BonCommande.DoesNotExist:
+            return Response({'error': 'Bon introuvable'}, status=404)
         bon.restore()
         return Response({'success': f'{bon.numero} restauré.'})
 
     @action(detail=True, methods=['delete'], url_path='supprimer_definitif')
     def supprimer_definitif(self, request, pk=None):
-        bon = self.get_object()
+        try:
+            bon = BonCommande.objects.get(pk=pk)
+        except BonCommande.DoesNotExist:
+            return Response({'error': 'Bon introuvable'}, status=404)
         if bon.pdf_file:
             bon.pdf_file.delete(save=False)
         bon.delete()

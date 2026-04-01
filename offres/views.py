@@ -24,13 +24,19 @@ class OffreServiceViewSet(viewsets.ModelViewSet):
 
     @action(detail=True, methods=['post'], url_path='restaurer')
     def restaurer(self, request, pk=None):
-        offre = self.get_object()
+        try:
+            offre = OffreService.objects.get(pk=pk)
+        except OffreService.DoesNotExist:
+            return Response({'error': 'Offre introuvable'}, status=404)
         offre.restore()
         return Response({'success': 'Offre restaurée.'})
 
     @action(detail=True, methods=['delete'], url_path='supprimer_definitif')
     def supprimer_definitif(self, request, pk=None):
-        offre = self.get_object()
+        try:
+            offre = OffreService.objects.get(pk=pk)
+        except OffreService.DoesNotExist:
+            return Response({'error': 'Offre introuvable'}, status=404)
         offre.delete()
         return Response({'success': 'Offre supprimée définitivement.'})
 
