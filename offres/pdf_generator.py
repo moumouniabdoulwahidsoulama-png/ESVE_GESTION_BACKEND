@@ -10,6 +10,7 @@ import os
 
 ORANGE = colors.HexColor('#D4A017')
 GRIS   = colors.HexColor('#555555')
+NOIR   = colors.HexColor('#1A1A2E')
 
 
 def _img(filename):
@@ -63,6 +64,8 @@ TEXTES = {
         'd4_titre': "Service technique et accompagnement",
         'd4_texte': ("Nos équipes qualifiées assurent l'installation, la maintenance et le suivi technique des équipements "
                      "fournis, avec un service après-vente réactif et proche de vos sites d'opération."),
+        'footer_left':  "ECOLOGY SMART VISION EQUIPEMENT\nS/C 04 BP 398 OUAGA 04 — Secteur 42 OUAGADOUGOU\n(+226) 05 56 25 92 — direction@svequipement.com",
+        'footer_right': "N° RIB : BF148-01001-077355324101-26\nN° RCCM : BF-OUA-01-2025-B13-08308\nN° IFU : 00272062K — Régime : RSI",
     },
     'en': {
         'objet_label': 'Subject:',
@@ -93,18 +96,9 @@ TEXTES = {
         'd4_titre': "Technical Service and Support",
         'd4_texte': ("Our qualified teams provide installation, maintenance and technical monitoring with a reactive "
                      "after-sales service close to your operating sites."),
+        'footer_left':  "ECOLOGY SMART VISION EQUIPEMENT\nS/C 04 BP 398 OUAGA 04 — Secteur 42 OUAGADOUGOU\n(+226) 05 56 25 92 — direction@svequipement.com",
+        'footer_right': "RIB: BF148-01001-077355324101-26\nRCCM: BF-OUA-01-2025-B13-08308\nIFU: 00272062K — Tax regime: RSI",
     }
-}
-
-FOOTER = {
-    'fr': ("ECOLOGY SMART VISION EQUIPEMENT  |  S/C 04 BP 398 OUAGA 04 – Secteur 42 OUAGADOUGOU  |  "
-           "(+226) 05 56 25 92  |  direction@svequipement.com\n"
-           "N° RIB : BF148-01001-077355324101-26  |  N° RCCM : BF-OUA-01-2025-B13-08308  |  "
-           "N° IFU : 00272062K  |  Régime : RSI  |  Division fiscale : OUAGA VII"),
-    'en': ("ECOLOGY SMART VISION EQUIPEMENT  |  S/C 04 BP 398 OUAGA 04 – Secteur 42 OUAGADOUGOU  |  "
-           "(+226) 05 56 25 92  |  direction@svequipement.com\n"
-           "RIB: BF148-01001-077355324101-26  |  RCCM: BF-OUA-01-2025-B13-08308  |  "
-           "IFU: 00272062K  |  Tax regime: RSI  |  Tax division: OUAGA VII"),
 }
 
 
@@ -113,6 +107,7 @@ def generer_pdf_offre(data: dict) -> bytes:
     T      = TEXTES[langue]
     buf    = BytesIO()
 
+    # ── Styles ────────────────────────────────────────────────────────────────
     s_normal = ParagraphStyle('n',  fontSize=10, leading=15, alignment=TA_JUSTIFY, spaceAfter=8)
     s_bold   = ParagraphStyle('b',  fontSize=10, leading=15, alignment=TA_JUSTIFY,
                                fontName='Helvetica-Bold', spaceAfter=8)
@@ -120,48 +115,64 @@ def generer_pdf_offre(data: dict) -> bytes:
     s_titre  = ParagraphStyle('t',  fontSize=11, leading=14, fontName='Helvetica-Bold',
                                textColor=ORANGE, spaceAfter=6)
     s_objet  = ParagraphStyle('o',  fontSize=10, leading=14, fontName='Helvetica-Bold', spaceAfter=10)
-    s_footer = ParagraphStyle('f',  fontSize=7.5, leading=11, alignment=TA_CENTER, textColor=GRIS)
-    s_slogan = ParagraphStyle('sl', fontSize=22, leading=28, textColor=ORANGE,
-                               fontName='Helvetica-Bold', alignment=TA_RIGHT)
+    s_footer = ParagraphStyle('f',  fontSize=7.5, leading=11, alignment=TA_LEFT, textColor=GRIS)
+    s_footer_r = ParagraphStyle('fr', fontSize=7.5, leading=11, alignment=TA_RIGHT, textColor=GRIS)
+    s_slogan = ParagraphStyle('sl', fontSize=20, leading=24, textColor=ORANGE,
+                               fontName='Helvetica-Bold', alignment=TA_CENTER)
 
     total_pages = [0]
 
     def draw_footer(canvas, doc):
+        """Footer 2 colonnes uniquement sur la dernière page."""
         canvas.saveState()
         if doc.page == total_pages[0]:
-            ft = Table([[Paragraph(FOOTER[langue].replace('\n', '<br/>'), s_footer)]],
-                       colWidths=[18*cm])
-            ft.setStyle(TableStyle([
-                ('LINEABOVE',     (0,0), (-1,-1), 1.5, ORANGE),
-                ('TOPPADDING',    (0,0), (-1,-1), 6),
-                ('BOTTOMPADDING', (0,0), (-1,-1), 4),
-            ]))
-            ft.wrapOn(canvas, A4[0] - 3*cm, 2.5*cm)
-            ft.drawOn(canvas, 1.5*cm, 0.8*cm)
+            w = A4[0]
+            y = 1.2*cm
+
+            # Ligne séparatrice
+            canvas.setStrokeColor(GRIS)
+            canvas.setLineWidth(0.5)
+            canvas.line(1.5*cm, y + 0.8*cm, w - 1.5*cm, y + 0.8*cm)
+
+            # Colonne gauche
+            p_left = Paragraph(T['footer_left'].replace('\n', '<br/>'), s_footer)
+            p_left.wrapOn(canvas, 9*cm, 2*cm)
+            p_left.drawOn(canvas, 1.5*cm, y - 0.4*cm)
+
+            # Colonne droite
+            p_right = Paragraph(T['footer_right'].replace('\n', '<br/>'), s_footer_r)
+            p_right.wrapOn(canvas, 9*cm, 2*cm)
+            p_right.drawOn(canvas, w - 10.5*cm, y - 0.4*cm)
+
         canvas.restoreState()
 
     def make_story():
         els = []
 
-        # ── EN-TÊTE : logo à gauche, slogan aligné à droite ──────────────────
+        # ── EN-TÊTE : Logo à gauche + Slogan centré ──────────────────────────
         logo_p = _img('logo-esve.jpg') or _img('logo-esve.png')
         slogan = Paragraph('The Supplier You Need', s_slogan)
+
         if logo_p:
-            hdr = Table([[RLImage(logo_p, 3.8*cm, 3.8*cm), slogan]],
-                        colWidths=[4.5*cm, 13.5*cm])
+            hdr = Table(
+                [[RLImage(logo_p, 3.5*cm, 3.5*cm), slogan, '']],
+                colWidths=[4.2*cm, 9.6*cm, 4.2*cm]
+            )
         else:
             hdr = Table([[slogan]], colWidths=[18*cm])
+
         hdr.setStyle(TableStyle([
             ('VALIGN',        (0,0), (-1,-1), 'MIDDLE'),
-            ('ALIGN',         (1,0), (1,0),   'RIGHT'),
-            ('LINEBELOW',     (0,0), (-1,-1), 2.5, ORANGE),
-            ('BOTTOMPADDING', (0,0), (-1,-1), 10),
-            ('TOPPADDING',    (0,0), (-1,-1), 5),
+            ('ALIGN',         (0,0), (0,0),   'LEFT'),    # logo à gauche
+            ('ALIGN',         (1,0), (1,0),   'CENTER'),  # slogan au centre
+            ('LINEBELOW',     (0,0), (-1,-1), 1.5, ORANGE),
+            ('BOTTOMPADDING', (0,0), (-1,-1), 12),
+            ('TOPPADDING',    (0,0), (-1,-1), 4),
         ]))
         els.append(hdr)
         els.append(Spacer(1, 0.8*cm))
 
-        # ── Destinataires ─────────────────────────────────────────────────────
+        # ── Destinataires à droite ─────────────────────────────────────────────
         soc = (data.get('societe') or '').strip()
         if soc:
             els.append(Paragraph(f'<b>{soc}</b>', s_right))
@@ -173,7 +184,7 @@ def generer_pdf_offre(data: dict) -> bytes:
                     (f'<b>{nom}</b>' if nom else '') + (f'  –  {fn}' if fn else ''), s_right))
         els.append(Spacer(1, 0.6*cm))
 
-        # ── Corps de lettre ───────────────────────────────────────────────────
+        # ── Corps lettre ───────────────────────────────────────────────────────
         els.append(Paragraph(f'{T["objet_label"]} <b>{T["objet_texte"]}</b>', s_objet))
         els.append(Paragraph(T['salutation'], s_bold))
         els.append(Spacer(1, 0.2*cm))
@@ -184,49 +195,52 @@ def generer_pdf_offre(data: dict) -> bytes:
             els.append(Paragraph(custom, s_normal))
         els.append(Spacer(1, 0.4*cm))
         els.append(Paragraph(T['attente'], s_normal))
-        els.append(Spacer(1, 1.2*cm))
+        els.append(Spacer(1, 1.0*cm))
 
-        # ── Domaines ─────────────────────────────────────────────────────────
-        els.append(HRFlowable(width='100%', thickness=1, color=ORANGE))
+        # ── Ligne séparatrice + Domaines ──────────────────────────────────────
+        els.append(HRFlowable(width='100%', thickness=0.8, color=GRIS))
         els.append(Spacer(1, 0.4*cm))
         els.append(Paragraph(f'<b>{T["domaines"]}</b>', s_bold))
         els.append(Spacer(1, 0.3*cm))
 
+        # D1 + D2
         els.append(Paragraph(T['d1_titre'], s_titre))
         els.append(Paragraph(T['d1_texte'], s_normal))
         els.append(Spacer(1, 0.2*cm))
         els.append(Paragraph(T['d2_titre'], s_titre))
         els.append(Paragraph(T['d2_texte'], s_normal))
 
-        # ── Grille photos produits ────────────────────────────────────────────
+        # ── Grille photos produits (C9) après D2 ─────────────────────────────
         prod_p = _img('esve_products.png')
         if prod_p:
-            els.append(Spacer(1, 0.4*cm))
-            els.append(RLImage(prod_p, width=18*cm, height=11.5*cm))
             els.append(Spacer(1, 0.5*cm))
+            els.append(RLImage(prod_p, width=18*cm, height=12*cm))
+            els.append(Spacer(1, 0.6*cm))
         else:
             els.append(Spacer(1, 0.4*cm))
 
+        # D3 + D4
         els.append(Paragraph(T['d3_titre'], s_titre))
         els.append(Paragraph(T['d3_texte'], s_normal))
         els.append(Spacer(1, 0.2*cm))
         els.append(Paragraph(T['d4_titre'], s_titre))
         els.append(Paragraph(T['d4_texte'], s_normal))
 
-        # ── Image terrain (dernière page) ─────────────────────────────────────
+        # ── Image terrain (C8) après D4 ───────────────────────────────────────
         field_p = _img('esve_field.png')
         if field_p:
             els.append(Spacer(1, 0.5*cm))
-            tbl = Table([[RLImage(field_p, width=18*cm, height=9*cm)]], colWidths=[18*cm])
+            tbl = Table([[RLImage(field_p, width=18*cm, height=9*cm)]],
+                        colWidths=[18*cm])
             tbl.setStyle(TableStyle([('ALIGN', (0,0), (-1,-1), 'CENTER')]))
             els.append(tbl)
 
         return els
 
     # Pré-build pour compter les pages
-    tmp = BytesIO()
+    tmp  = BytesIO()
     dtmp = SimpleDocTemplate(tmp, pagesize=A4, rightMargin=1.5*cm, leftMargin=1.5*cm,
-                              topMargin=1.5*cm, bottomMargin=2.5*cm)
+                              topMargin=1.5*cm, bottomMargin=3*cm)
     class PC:
         count = 0
         def __call__(self, c, d): self.count = d.page
@@ -236,6 +250,6 @@ def generer_pdf_offre(data: dict) -> bytes:
 
     # Build final
     doc = SimpleDocTemplate(buf, pagesize=A4, rightMargin=1.5*cm, leftMargin=1.5*cm,
-                             topMargin=1.5*cm, bottomMargin=2.5*cm)
+                             topMargin=1.5*cm, bottomMargin=3*cm)
     doc.build(make_story(), onFirstPage=draw_footer, onLaterPages=draw_footer)
     return buf.getvalue()
