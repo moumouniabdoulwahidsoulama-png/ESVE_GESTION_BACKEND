@@ -19,26 +19,57 @@ class FactureViewSet(viewsets.ModelViewSet):
 
     def get_queryset(self):
         user = self.request.user
+        # Corbeille : paramètre ?corbeille=1
+        show_deleted = self.request.query_params.get('corbeille', '0') == '1'
         try:
             if user.profil.role == 'CLIENT':
                 from clients.models import Client
                 try:
                     client = Client.objects.get(email=user.email)
                     return Facture.objects.filter(
-                        client=client,
-                        is_deleted=False          # ✅ exclure corbeille
+                        client=client, is_deleted=show_deleted
                     ).select_related('client')
                 except Client.DoesNotExist:
                     return Facture.objects.none()
         except Exception:
             pass
-        # ✅ Par défaut : n'afficher que les non supprimés
-        return Facture.objects.filter(is_deleted=False).select_related('client')
+        return Facture.objects.filter(is_deleted=show_deleted).select_related('client')
 
     def get_serializer_class(self):
         if self.action in ['create', 'update', 'partial_update']:
             return FactureCreateSerializer
         return FactureSerializer
+
+    # ✅ Soft delete au lieu de vraiment supprimer
+    def destroy(self, request, *args, **kwargs):
+        facture = self.get_object()
+        # Si cette facture vient d'une proforma, on remet la proforma en BROUILLON
+        if facture.proforma_origine:
+            try:
+                proforma = facture.proforma_origine
+                proforma.statut = 'BROUILLON'
+                proforma.save(update_fields=['statut'])
+            except Exception:
+                pass
+        facture.soft_delete()
+        return Response({'success': 'Facture déplacée dans la corbeille.'},
+                        status=status.HTTP_200_OK)
+
+    # ✅ Restaurer depuis la corbeille
+    @action(detail=True, methods=['post'])
+    def restaurer(self, request, pk=None):
+        facture = self.get_object()
+        facture.restore()
+        return Response({'success': f'{facture.numero} restaurée.'})
+
+    # ✅ Suppression définitive
+    @action(detail=True, methods=['delete'])
+    def supprimer_definitif(self, request, pk=None):
+        facture = self.get_object()
+        if facture.pdf_file:
+            facture.pdf_file.delete(save=False)
+        facture.delete()
+        return Response({'success': 'Supprimée définitivement.'})
 
     def update(self, request, *args, **kwargs):
         response = super().update(request, *args, **kwargs)
@@ -54,53 +85,23 @@ class FactureViewSet(viewsets.ModelViewSet):
         kwargs['partial'] = True
         return self.update(request, *args, **kwargs)
 
-    # ✅ Override destroy — soft delete au lieu de vraie suppression
-    def destroy(self, request, *args, **kwargs):
-        facture = self.get_object()
-        facture.soft_delete()
-        return Response(status=status.HTTP_204_NO_CONTENT)
-
-    # ✅ Corbeille — liste des documents supprimés
-    @action(detail=False, methods=['get'])
-    def corbeille(self, request):
-        factures = Facture.objects.filter(is_deleted=True).select_related('client')
-        serializer = FactureSerializer(factures, many=True)
-        return Response(serializer.data)
-
-    # ✅ Restaurer un document depuis la corbeille
-    @action(detail=True, methods=['post'])
-    def restaurer(self, request, pk=None):
-        # Chercher dans TOUS les documents (y compris supprimés)
-        try:
-            facture = Facture.objects.get(pk=pk)
-        except Facture.DoesNotExist:
-            return Response({'error': 'Document introuvable.'}, status=status.HTTP_404_NOT_FOUND)
-        if not facture.is_deleted:
-            return Response({'error': 'Ce document n\'est pas dans la corbeille.'}, status=status.HTTP_400_BAD_REQUEST)
-        facture.restaurer()
-        return Response(FactureSerializer(facture).data)
-
-    # ✅ Suppression définitive depuis la corbeille
-    @action(detail=True, methods=['delete'])
-    def supprimer_definitif(self, request, pk=None):
-        try:
-            facture = Facture.objects.get(pk=pk)
-        except Facture.DoesNotExist:
-            return Response({'error': 'Document introuvable.'}, status=status.HTTP_404_NOT_FOUND)
-        facture.delete()
-        return Response(status=status.HTTP_204_NO_CONTENT)
-
     @action(detail=True, methods=['post'])
     def valider(self, request, pk=None):
         proforma = self.get_object()
         if proforma.type_doc != 'PROFORMA':
-            return Response(
-                {'error': 'Ce document est déjà une facture définitive.'},
-                status=status.HTTP_400_BAD_REQUEST
-            )
+            return Response({'error': 'Ce document est déjà une facture définitive.'},
+                            status=status.HTTP_400_BAD_REQUEST)
         if proforma.statut == 'ANNULE':
+            return Response({'error': 'Impossible de valider une proforma annulée.'},
+                            status=status.HTTP_400_BAD_REQUEST)
+
+        # ✅ Vérifie qu'il n'existe pas déjà une facture active (non supprimée) pour cette proforma
+        facture_active = Facture.objects.filter(
+            proforma_origine=proforma, is_deleted=False
+        ).first()
+        if facture_active:
             return Response(
-                {'error': 'Impossible de valider une proforma annulée.'},
+                {'error': f'Une facture existe déjà : {facture_active.numero}'},
                 status=status.HTTP_400_BAD_REQUEST
             )
 
@@ -111,7 +112,6 @@ class FactureViewSet(viewsets.ModelViewSet):
             type_doc            = 'FACTURE',
             statut              = 'ENVOYE',
             proforma_origine    = proforma,
-            date_creation       = proforma.date_creation,
             validite_jours      = proforma.validite_jours,
             termes_paiement     = proforma.termes_paiement,
             remise_pct          = proforma.remise_pct,
@@ -153,10 +153,7 @@ class FactureViewSet(viewsets.ModelViewSet):
         except Exception as e:
             print(f"Erreur PDF : {e}")
 
-        return Response(
-            FactureSerializer(facture).data,
-            status=status.HTTP_201_CREATED
-        )
+        return Response(FactureSerializer(facture).data, status=status.HTTP_201_CREATED)
 
     @action(detail=True, methods=['post'])
     def generer_pdf(self, request, pk=None):
@@ -165,15 +162,9 @@ class FactureViewSet(viewsets.ModelViewSet):
             if facture.pdf_file:
                 facture.pdf_file.delete(save=False)
             generer_pdf_facture(facture)
-            return Response(
-                {'success': f'PDF généré : {facture.numero}.pdf'},
-                status=status.HTTP_200_OK
-            )
+            return Response({'success': f'PDF généré : {facture.numero}.pdf'})
         except Exception as e:
-            return Response(
-                {'error': str(e)},
-                status=status.HTTP_500_INTERNAL_SERVER_ERROR
-            )
+            return Response({'error': str(e)}, status=500)
 
     @action(detail=True, methods=['get'])
     def pdf(self, request, pk=None):
@@ -184,14 +175,8 @@ class FactureViewSet(viewsets.ModelViewSet):
             generer_pdf_facture(facture)
             facture.refresh_from_db()
         except Exception as e:
-            return Response(
-                {'error': f'Impossible de générer le PDF : {str(e)}'},
-                status=status.HTTP_500_INTERNAL_SERVER_ERROR
-            )
-        response = FileResponse(
-            facture.pdf_file.open('rb'),
-            content_type='application/pdf'
-        )
+            return Response({'error': f'Impossible de générer le PDF : {str(e)}'}, status=500)
+        response = FileResponse(facture.pdf_file.open('rb'), content_type='application/pdf')
         response['Content-Disposition'] = f'attachment; filename="{facture.numero}.pdf"'
         return response
 
@@ -207,5 +192,5 @@ class LigneFactureViewSet(viewsets.ModelViewSet):
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
 def dashboard_stats(request):
-    stats = get_dashboard_stats()
-    return Response(stats)
+    from .dashboard import get_dashboard_stats
+    return Response(get_dashboard_stats())
