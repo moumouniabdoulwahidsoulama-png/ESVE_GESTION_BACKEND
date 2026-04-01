@@ -62,7 +62,7 @@ class FactureViewSet(viewsets.ModelViewSet):
             facture = Facture.objects.get(pk=pk)
         except Facture.DoesNotExist:
             return Response({'error': 'Facture introuvable'}, status=404)
-        facture.restore()
+        facture.restaurer()
         return Response({'success': f'{facture.numero} restaurée.'})
 
     @action(detail=True, methods=['delete'], url_path='supprimer_definitif')
