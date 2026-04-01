@@ -203,7 +203,7 @@ def generer_pdf_offre(data: dict) -> bytes:
         els = []
         els.append(Spacer(1, HEADER_SPACE))
 
-        # Destinataires à droite
+        # Destinataires à droite (société, noms, adresse, date)
         soc = (data.get('societe') or '').strip()
         if soc:
             els.append(Paragraph(f'<b>{soc}</b>', s_r))
@@ -213,6 +213,14 @@ def generer_pdf_offre(data: dict) -> bytes:
             if nom or fn:
                 els.append(Paragraph(
                     (f'<b>{nom}</b>' if nom else '') + (f'  –  {fn}' if fn else ''), s_r))
+        adresse = (data.get('adresse') or '').strip()
+        if adresse:
+            els.append(Paragraph(adresse, s_r))
+        date_doc = (data.get('date_doc') or '').strip()
+        if date_doc:
+            els.append(Paragraph(
+                f'Ouagadougou, le {date_doc}' if langue == 'fr' else f'Ouagadougou, {date_doc}',
+                s_r))
         els.append(Spacer(1, 0.5*cm))
 
         # Corps lettre page 1
@@ -255,10 +263,11 @@ def generer_pdf_offre(data: dict) -> bytes:
         els.append(Paragraph(T['d4_titre'], s_t))
         els.append(Paragraph(T['d4_texte'], s_n))
 
-        # Image terrain (C8) — grande pour remplir la page jusqu'au footer
+        # Image terrain (C8) — un peu moins haute pour ne pas coller au footer
         if field_p:
-            els.append(Spacer(1, 0.3*cm))
-            els.append(RLImage(field_p, width=CONTENT_W, height=16*cm))
+            els.append(Spacer(1, 0.5*cm))
+            els.append(RLImage(field_p, width=CONTENT_W, height=12*cm))
+            els.append(Spacer(1, 0.8*cm))
 
         return els
 

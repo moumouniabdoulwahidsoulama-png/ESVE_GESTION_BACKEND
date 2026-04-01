@@ -6,6 +6,8 @@ class OffreService(models.Model):
 
     langue         = models.CharField(max_length=2, choices=LANGUE_CHOICES, default='fr')
     societe        = models.CharField(max_length=200, blank=True)
+    adresse        = models.CharField(max_length=300, blank=True)
+    date_doc       = models.CharField(max_length=100, blank=True)
     destinataires  = models.JSONField(default=list, blank=True)
     texte_custom   = models.TextField(blank=True)
     date_creation  = models.DateTimeField(auto_now_add=True)
