@@ -255,10 +255,10 @@ def generer_pdf_offre(data: dict) -> bytes:
         els.append(Paragraph(T['d4_titre'], s_t))
         els.append(Paragraph(T['d4_texte'], s_n))
 
-        # Image terrain (C8) — collée juste sous D4, avant le footer
+        # Image terrain (C8) — grande pour remplir la page jusqu'au footer
         if field_p:
             els.append(Spacer(1, 0.3*cm))
-            els.append(RLImage(field_p, width=CONTENT_W, height=10*cm))
+            els.append(RLImage(field_p, width=CONTENT_W, height=16*cm))
 
         return els
 
