@@ -46,6 +46,8 @@ class OffreServiceViewSet(viewsets.ModelViewSet):
         data  = {
             'langue':        offre.langue,
             'societe':       offre.societe,
+            'adresse':       offre.adresse,
+            'date_doc':      offre.date_doc,
             'destinataires': offre.destinataires,
             'texte_custom':  offre.texte_custom,
         }
